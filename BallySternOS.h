@@ -21,7 +21,7 @@
 #ifndef BALLY_STERN_OS_H
 
 #define BALLY_STERN_OS_MAJOR_VERSION  1
-#define BALLY_STERN_OS_MINOR_VERSION  2
+#define BALLY_STERN_OS_MINOR_VERSION  3
 
 /*
 struct PlayfieldLight {
