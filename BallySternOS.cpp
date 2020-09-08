@@ -32,9 +32,7 @@ volatile boolean DisplayDim[5];
 volatile boolean DisplayOffCycle = false;
 volatile byte CurrentDisplayDigit=0;
 volatile byte LampStates[16], LampDim0[16], LampDim1[16];
-volatile int LampFlashPeriod[64];
-volatile int SelfTestMode = 1;
-volatile boolean AttractMode = false;
+volatile byte LampFlashPeriod[60];
 byte DimDivisor1 = 2;
 byte DimDivisor2 = 3;
 
@@ -44,10 +42,10 @@ volatile byte SwitchesNow[5];
 byte DipSwitches[4];
 
 
-#define SOLENOID_STACK_SIZE 100
+#define SOLENOID_STACK_SIZE 64
 #define SOLENOID_STACK_EMPTY 0xFF
-volatile int SolenoidStackFirst;
-volatile int SolenoidStackLast;
+volatile byte SolenoidStackFirst;
+volatile byte SolenoidStackLast;
 volatile byte SolenoidStack[SOLENOID_STACK_SIZE];
 boolean SolenoidStackEnabled = true;
 volatile byte CurrentSolenoidByte = 0xFF;
@@ -62,10 +60,10 @@ struct TimedSolenoidEntry {
 };
 TimedSolenoidEntry TimedSolenoidStack[32];
 
-#define SWITCH_STACK_SIZE   100
+#define SWITCH_STACK_SIZE   64
 #define SWITCH_STACK_EMPTY  0xFF
-volatile int SwitchStackFirst;
-volatile int SwitchStackLast;
+volatile byte SwitchStackFirst;
+volatile byte SwitchStackLast;
 volatile byte SwitchStack[SWITCH_STACK_SIZE];
 
 #define ADDRESS_U10_A           0x14
@@ -279,7 +277,7 @@ void InitializeU11PIA() {
 
 
 int SpaceLeftOnSwitchStack() {
-  if (SwitchStackFirst<0 || SwitchStackLast<0 || SwitchStackFirst>=SWITCH_STACK_SIZE || SwitchStackLast>=SWITCH_STACK_SIZE) return 0;
+  if (SwitchStackFirst>=SWITCH_STACK_SIZE || SwitchStackLast>=SWITCH_STACK_SIZE) return 0;
   if (SwitchStackLast>=SwitchStackFirst) return ((SWITCH_STACK_SIZE-1) - (SwitchStackLast-SwitchStackFirst));
   return (SwitchStackFirst - SwitchStackLast) - 1;
 }
@@ -330,7 +328,7 @@ boolean BSOS_ReadSingleSwitchState(byte switchNum) {
 
 
 int SpaceLeftOnSolenoidStack() {
-  if (SolenoidStackFirst<0 || SolenoidStackLast<0 || SolenoidStackFirst>=SOLENOID_STACK_SIZE || SolenoidStackLast>=SOLENOID_STACK_SIZE) return 0;
+  if (SolenoidStackFirst>=SOLENOID_STACK_SIZE || SolenoidStackLast>=SOLENOID_STACK_SIZE) return 0;
   if (SolenoidStackLast>=SolenoidStackFirst) return ((SOLENOID_STACK_SIZE-1) - (SolenoidStackLast-SolenoidStackFirst));
   return (SolenoidStackFirst - SolenoidStackLast) - 1;
 }
@@ -628,6 +626,11 @@ void InterruptService2() {
 
     for (int lampBitCount = 0; lampBitCount<15; lampBitCount++) {
       byte lampData = 0xF0 + lampBitCount;
+
+      interrupts();
+      BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+      noInterrupts();
+      
       // Latch address & strobe
       BSOS_DataWrite(ADDRESS_U10_A, lampData);
       if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
@@ -654,6 +657,9 @@ void InterruptService2() {
     BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
+
+    interrupts();
+    noInterrupts();
 
     // If we need to start any solenoids, do them now
     // (we know we need to start if we weren't already firing any solenoids
@@ -819,8 +825,15 @@ void BSOS_SetLampState(int lampNum, byte s_lampState, byte s_lampDim, int s_lamp
   if (lampNum>59 || lampNum<0) return;
   
   if (s_lampState) {
-    LampStates[lampNum/4] &= ~(0x10<<(lampNum%4));
-    LampFlashPeriod[lampNum] = s_lampFlashPeriod;
+    int adjustedLampFlash = s_lampFlashPeriod/50;
+    
+    if (s_lampFlashPeriod!=0 && adjustedLampFlash==0) adjustedLampFlash = 1;
+    if (adjustedLampFlash>250) adjustedLampFlash = 250;
+    
+    // Only turn on the lamp if there's no flash, because if there's a flash
+    // then the lamp will be turned on by the ApplyFlashToLamps function
+    if (s_lampFlashPeriod==0) LampStates[lampNum/4] &= ~(0x10<<(lampNum%4));
+    LampFlashPeriod[lampNum] = adjustedLampFlash;
   } else {
     LampStates[lampNum/4] |= (0x10<<(lampNum%4));
     LampFlashPeriod[lampNum] = 0;
@@ -844,7 +857,8 @@ void BSOS_SetLampState(int lampNum, byte s_lampState, byte s_lampDim, int s_lamp
 void BSOS_ApplyFlashToLamps(unsigned long curTime) {
   for (int count=0; count<60; count++) {
     if ( LampFlashPeriod[count]!=0 ) {
-      if ((curTime/LampFlashPeriod[count])%2) {
+      unsigned long adjustedLampFlash = (unsigned long)LampFlashPeriod[count] * (unsigned long)50;
+      if ((curTime/adjustedLampFlash)%2) {
         LampStates[count/4] &= ~(0x10<<(count%4));
       } else {
         LampStates[count/4] |= (0x10<<(count%4));
@@ -888,7 +902,7 @@ void BSOS_InitializeMPU() {
   boolean sawLow = false;
   // for three seconds, look for activity on the VMA line (A5)
   // If we see anything, then the MPU is active so we shouldn't run
-  while ((millis()-startTime)<1200) {
+  while ((millis()-startTime)<2000) {
     if (digitalRead(A5)) sawHigh = true;
     else sawLow = true;
   }
@@ -950,12 +964,9 @@ void BSOS_InitializeMPU() {
 
   // Set default values for the displays
   for (int displayCount=0; displayCount<5; displayCount++) {
-    DisplayDigits[displayCount][0] = 0;
-    DisplayDigits[displayCount][1] = 0;
-    DisplayDigits[displayCount][2] = 0;
-    DisplayDigits[displayCount][3] = 0;
-    DisplayDigits[displayCount][4] = 0;
-    DisplayDigits[displayCount][5] = 0;
+    for (int digitCount=0; digitCount<6; digitCount++) {
+      DisplayDigits[displayCount][digitCount] = 0;
+    }
     DisplayDigitEnable[displayCount] = 0x03;
     DisplayDim[displayCount] = false;
   }
@@ -967,7 +978,7 @@ void BSOS_InitializeMPU() {
     LampDim1[lampNibbleCounter] = 0x00;
   }
 
-  for (int lampFlashCount=0; lampFlashCount<64; lampFlashCount++) {
+  for (int lampFlashCount=0; lampFlashCount<60; lampFlashCount++) {
     LampFlashPeriod[lampFlashCount] = 0;
   }
 
