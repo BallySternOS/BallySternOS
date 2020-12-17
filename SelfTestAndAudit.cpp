@@ -32,6 +32,8 @@ unsigned long NextSpeedyValueChange = 0;
 unsigned long NumSpeedyChanges = 0;
 unsigned long LastResetPress = 0;
 byte CurValue = 0;
+byte CurSound = 0x01;
+byte SoundPlaying = 0;
 boolean SolenoidCycle = true;
 
 
@@ -101,7 +103,6 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
       }
       CurValue = 99;
       BSOS_SetDisplay(0, CurValue, true);  
-//      BSOS_SetDisplayBlankByMagnitude(0, CurValue);      
     }
     if (curSwitch==resetSwitch || resetDoubleClick) {
       CurValue += 1;
@@ -116,7 +117,6 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
         BSOS_SetLampState(CurValue, 1, 0, 500);
       }      
       BSOS_SetDisplay(0, CurValue, true);  
-//      BSOS_SetDisplayBlankByMagnitude(0, CurValue);      
     }    
   } else if (curState==MACHINE_STATE_TEST_DISPLAYS) {
     if (curStateChanged) {
@@ -145,7 +145,7 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
       SolenoidCycle = true;
       SavedValue = 0;
       BSOS_PushToSolenoidStack(SavedValue, 5);
-    }
+    } 
     if (curSwitch==resetSwitch || resetDoubleClick) {
       SolenoidCycle = (SolenoidCycle) ? false : true;
     }
@@ -157,7 +157,6 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
       }
       BSOS_PushToSolenoidStack(SavedValue, 3);
       BSOS_SetDisplay(0, SavedValue, true);
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
       LastSolTestTime = CurrentTime;
     }
     
@@ -174,7 +173,6 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     for (byte switchCount=0; switchCount<40 && displayOutput<4; switchCount++) {
       if (BSOS_ReadSingleSwitchState(switchCount)) {
         BSOS_SetDisplay(displayOutput, switchCount, true);
-//        BSOS_SetDisplayBlankByMagnitude(displayOutput, switchCount);
         displayOutput += 1;
       }
     }
@@ -185,7 +183,20 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
       }
     }
 
+  } else if (curState==MACHINE_STATE_TEST_SOUNDS) {
+    BSOS_SetDisplayCredits(0);
+    BSOS_SetDisplayBallInPlay(5);
+    byte soundToPlay = 0x01 << (((CurrentTime-LastSelfTestChange)/750)%8);
+    if (SoundPlaying!=soundToPlay) {
+      BSOS_PlaySB100(soundToPlay);
+      SoundPlaying = soundToPlay;
+      BSOS_SetDisplay(0, (unsigned long)soundToPlay, true);
+      LastSolTestTime = CurrentTime; // Time the sound started to play
+    }
+    // If the sound play call was more than 300ms ago, turn it off
+//    if ((CurrentTime-LastSolTestTime)>300) BSOS_PlaySB100(128);
   } else if (curState==MACHINE_STATE_TEST_SCORE_LEVEL_1) {
+    if (curStateChanged) BSOS_PlaySB100(128);
     savedScoreStartByte = BSOS_AWARD_SCORE_1_EEPROM_START_BYTE;
   } else if (curState==MACHINE_STATE_TEST_SCORE_LEVEL_2) {
     savedScoreStartByte = BSOS_AWARD_SCORE_2_EEPROM_START_BYTE;
@@ -197,13 +208,11 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     if (curStateChanged) {
       SavedValue = BSOS_ReadByteFromEEProm(BSOS_CREDITS_EEPROM_BYTE);
       BSOS_SetDisplay(0, SavedValue, true);
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
     }
     if (curSwitch==resetSwitch || resetDoubleClick) {
       SavedValue += 1;
       if (SavedValue>20) SavedValue = 0;
       BSOS_SetDisplay(0, SavedValue, true);
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
       BSOS_WriteByteToEEProm(BSOS_CREDITS_EEPROM_BYTE, SavedValue & 0x000000FF);
     }
   } else if (curState==MACHINE_STATE_TEST_TOTAL_PLAYS) {
@@ -224,20 +233,17 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     if (curStateChanged) {
       SavedValue = BSOS_ReadULFromEEProm(savedScoreStartByte);
       BSOS_SetDisplay(0, SavedValue, true);  
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
     }
 
     if (curSwitch==resetSwitch) {
       SavedValue += 1000;
       BSOS_SetDisplay(0, SavedValue, true);  
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
       BSOS_WriteULToEEProm(savedScoreStartByte, SavedValue);
     }
 
     if (resetBeingHeld && (CurrentTime>=NextSpeedyValueChange)) {
       SavedValue += 1000;
       BSOS_SetDisplay(0, SavedValue, true);  
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
       if (NumSpeedyChanges<6) NextSpeedyValueChange = CurrentTime + 400;
       else if (NumSpeedyChanges<50) NextSpeedyValueChange = CurrentTime + 50;
       else NextSpeedyValueChange = CurrentTime + 10;
@@ -252,8 +258,6 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     if (resetDoubleClick) {
       SavedValue = 0;
       BSOS_SetDisplay(0, SavedValue, true);  
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue, true);
-//      BSOS_WriteULToEEProm(savedScoreStartByte, SavedValue);
     }
   }
 
@@ -261,13 +265,11 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     if (curStateChanged) {
       SavedValue = BSOS_ReadULFromEEProm(auditNumStartByte);
       BSOS_SetDisplay(0, SavedValue, true);
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
     }
 
     if (resetDoubleClick) {
       SavedValue = 0;
       BSOS_SetDisplay(0, SavedValue, true);  
-//      BSOS_SetDisplayBlankByMagnitude(0, SavedValue);
       BSOS_WriteULToEEProm(auditNumStartByte, SavedValue);
     }
     
