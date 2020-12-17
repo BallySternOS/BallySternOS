@@ -21,7 +21,7 @@
 #ifndef BALLY_STERN_OS_H
 
 #define BALLY_STERN_OS_MAJOR_VERSION  1
-#define BALLY_STERN_OS_MINOR_VERSION  4
+#define BALLY_STERN_OS_MINOR_VERSION  5
 
 /*
 struct PlayfieldLight {
@@ -161,6 +161,7 @@ void BSOS_SetDimDivisor(byte level=1, byte divisor=2); // 2 means 50% duty cycle
 
 //   Sound
 void BSOS_PlaySoundSquawkAndTalk(byte soundByte);
+void BSOS_PlaySB100(byte soundByte);
 
 //   General
 byte BSOS_DataRead(int address);

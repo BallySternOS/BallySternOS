@@ -74,6 +74,7 @@ volatile byte SwitchStack[SWITCH_STACK_SIZE];
 #define ADDRESS_U11_A_CONTROL   0x19
 #define ADDRESS_U11_B           0x1A
 #define ADDRESS_U11_B_CONTROL   0x1B
+#define ADDRESS_SB100           0x10
 
 void BSOS_DataWrite(int address, byte data) {
   
@@ -921,6 +922,10 @@ void BSOS_InitializeMPU() {
   // Set up the address lines A0-A7 as output
   DDRC = DDRC | 0x3F;
 
+  // Set up D13 as address line A5 (and set it low)
+  DDRB = DDRB | 0x20;
+  PORTB = PORTB & 0xDF;
+
   // Set up A6 as output
   pinMode(A6, OUTPUT); // /HLT
 
@@ -1137,6 +1142,29 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
   InsideZeroCrossingInterrupt -= 1;
 }
 
+// This function relies on D13 being connected to A5 because it writes to address 0xA0
+// A0  - A0   0
+// A1  - A1   0   
+// A2  - n/c  0
+// A3  - A2   0
+// A4  - A3   0
+// A5  - D13  1
+// A6  - n/c  0
+// A7  - A4   1
+// A8  - n/c  0
+// A9  - GND  0
+// A10 - n/c  0
+// A11 - n/c  0
+// A12 - GND  0
+// A13 - n/c  0
+void BSOS_PlaySB100(byte soundByte) {
+
+  PORTB = PORTB | 0x20;
+  BSOS_DataWrite(ADDRESS_SB100, soundByte);
+  PORTB = PORTB & 0xDF;
+  
+}
+
 
 
 // EEProm Helper functions
@@ -1156,29 +1184,7 @@ byte BSOS_ReadByteFromEEProm(unsigned short startByte) {
   return value;
 }
 
-/*
-void BSOS_WriteHighScoreToEEProm(unsigned long score) {
-  EEPROM.write(BSOS_HIGHSCORE_EEPROM_START_BYTE+3, (byte)(score>>24));
-  EEPROM.write(BSOS_HIGHSCORE_EEPROM_START_BYTE+2, (byte)((score>>16) & 0x000000FF));
-  EEPROM.write(BSOS_HIGHSCORE_EEPROM_START_BYTE+1, (byte)((score>>8) & 0x000000FF));
-  EEPROM.write(BSOS_HIGHSCORE_EEPROM_START_BYTE, (byte)(score & 0x000000FF));
-}
 
-unsigned long BSOS_ReadHighScoreFromEEProm() {
-  unsigned long value;
-
-  value = (((unsigned long)EEPROM.read(BSOS_HIGHSCORE_EEPROM_START_BYTE+3))<<24) | 
-          ((unsigned long)(EEPROM.read(BSOS_HIGHSCORE_EEPROM_START_BYTE+2))<<16) | 
-          ((unsigned long)(EEPROM.read(BSOS_HIGHSCORE_EEPROM_START_BYTE+1))<<8) | 
-          ((unsigned long)(EEPROM.read(BSOS_HIGHSCORE_EEPROM_START_BYTE)));
-
-  if (value==0xFFFFFFFF) {
-    value = 100000; // default score
-    BSOS_WriteHighScoreToEEProm(value);
-  }
-  return value;
-}
-*/
 
 unsigned long BSOS_ReadULFromEEProm(unsigned short startByte, unsigned long defaultValue) {
   unsigned long value;
