@@ -23,6 +23,7 @@
 #include "BallySternOS.h"
 
 #define MACHINE_STATE_ATTRACT         0
+#define USE_SB100
 
 unsigned long LastSolTestTime = 0; 
 unsigned long LastSelfTestChange = 0;
@@ -86,7 +87,7 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     }
 
     if (curState<=MACHINE_STATE_TEST_SCORE_LEVEL_1) {
-      BSOS_SetDisplayCredits(abs(curState)-4);
+      BSOS_SetDisplayCredits(abs(curState)+MACHINE_STATE_TEST_SOUNDS);
       BSOS_SetDisplayBallInPlay(0, false);
     }
   }
@@ -186,6 +187,7 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
   } else if (curState==MACHINE_STATE_TEST_SOUNDS) {
     BSOS_SetDisplayCredits(0);
     BSOS_SetDisplayBallInPlay(5);
+#ifdef USE_SB100    
     byte soundToPlay = 0x01 << (((CurrentTime-LastSelfTestChange)/750)%8);
     if (SoundPlaying!=soundToPlay) {
       BSOS_PlaySB100(soundToPlay);
@@ -195,8 +197,11 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     }
     // If the sound play call was more than 300ms ago, turn it off
 //    if ((CurrentTime-LastSolTestTime)>300) BSOS_PlaySB100(128);
+#endif
   } else if (curState==MACHINE_STATE_TEST_SCORE_LEVEL_1) {
-    if (curStateChanged) BSOS_PlaySB100(128);
+#ifdef USE_SB100    
+    if (curStateChanged) BSOS_PlaySB100(0);
+#endif
     savedScoreStartByte = BSOS_AWARD_SCORE_1_EEPROM_START_BYTE;
   } else if (curState==MACHINE_STATE_TEST_SCORE_LEVEL_2) {
     savedScoreStartByte = BSOS_AWARD_SCORE_2_EEPROM_START_BYTE;

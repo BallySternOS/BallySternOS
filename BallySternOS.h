@@ -23,13 +23,9 @@
 #define BALLY_STERN_OS_MAJOR_VERSION  1
 #define BALLY_STERN_OS_MINOR_VERSION  5
 
-/*
-struct PlayfieldLight {
-  byte lightNum;
-  byte row;
-  byte col;
-};
-*/
+//#define BALLY_STERN_OS_USE_DIP_SWITCHES 
+//#define BALLY_STERN_OS_USE_SQUAWK_AND_TALK
+#define BALLY_STERN_OS_USE_SB100
 
 struct PlayfieldAndCabinetSwitch {
   byte switchNum;
@@ -76,8 +72,6 @@ struct PlayfieldAndCabinetSwitch {
 
 // PIA @ U11 = A4, A7, !A9, !A12      
 // PIA @ U10 = A3, A7, !A9, !A12
-
-
 
 
 #define SW_SELF_TEST_SWITCH 0x7F
@@ -160,8 +154,12 @@ void BSOS_TurnOffAllLamps();
 void BSOS_SetDimDivisor(byte level=1, byte divisor=2); // 2 means 50% duty cycle, 3 means 33%, 4 means 25%...
 
 //   Sound
+#ifdef BALLY_STERN_OS_USE_SQUAWK_AND_TALK
 void BSOS_PlaySoundSquawkAndTalk(byte soundByte);
+#endif
+#ifdef BALLY_STERN_OS_USE_SB100
 void BSOS_PlaySB100(byte soundByte);
+#endif
 
 //   General
 byte BSOS_DataRead(int address);

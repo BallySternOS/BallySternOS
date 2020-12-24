@@ -39,7 +39,9 @@ byte DimDivisor2 = 3;
 volatile byte SwitchesMinus2[5];
 volatile byte SwitchesMinus1[5];
 volatile byte SwitchesNow[5];
+#ifdef BALLY_STERN_OS_USE_DIP_SWITCHES
 byte DipSwitches[4];
+#endif
 
 
 #define SOLENOID_STACK_SIZE 64
@@ -212,6 +214,7 @@ void InitializeU10PIA() {
 
 }
 
+#ifdef BALLY_STERN_OS_USE_DIP_SWITCHES
 void ReadDipSwitches() {
   byte backupU10A = BSOS_DataRead(ADDRESS_U10_A);
   byte backupU10BControl = BSOS_DataRead(ADDRESS_U10_B_CONTROL);
@@ -247,7 +250,7 @@ void ReadDipSwitches() {
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl);
   BSOS_DataWrite(ADDRESS_U10_A, backupU10A);
 }
-
+#endif
 
 void InitializeU11PIA() {
   // CA1 - Display interrupt generator
@@ -687,7 +690,6 @@ void InterruptService2() {
 
 
 void BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagnitude, byte minDigits) {
-//void BSOS_SetDisplay(int displayNumber, unsigned long value) {
   if (displayNumber<0 || displayNumber>4) return;
 
   byte blank = 0x00;
@@ -700,14 +702,7 @@ void BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagn
   }
 
   if (blankByMagnitude) DisplayDigitEnable[displayNumber] = blank;
-/*
-  DisplayDigits[displayNumber][0] = (value%1000000) / 100000;
-  DisplayDigits[displayNumber][1] = (value%100000) / 10000;
-  DisplayDigits[displayNumber][2] = (value%10000) / 1000;
-  DisplayDigits[displayNumber][3] = (value%1000) / 100;
-  DisplayDigits[displayNumber][4] = (value%100) / 10;
-  DisplayDigits[displayNumber][5] = (value%10);
-*/  
+  else DisplayDigitEnable[displayNumber] = 0x3F;
 }
 
 void BSOS_SetDisplayBlank(int displayNumber, byte bitMask) {
@@ -952,7 +947,9 @@ void BSOS_InitializeMPU() {
   InitializeU11PIA();
 
   // Read values from MPU dip switches
+#ifdef BALLY_STERN_OS_USE_DIP_SWITCHES  
   ReadDipSwitches();
+#endif 
   
   // Reset address bus
   BSOS_DataRead(0);
@@ -1009,10 +1006,13 @@ void BSOS_InitializeMPU() {
 
 }
 
-
 byte BSOS_GetDipSwitches(byte index) {
+#ifdef BALLY_STERN_OS_USE_DIP_SWITCHES
   if (index>3) return 0x00;
   return DipSwitches[index];
+#else
+  return 0x00;
+#endif
 }
 
 
@@ -1097,7 +1097,7 @@ void BSOS_CycleAllDisplays(unsigned long curTime, byte digitNum) {
   }
 }
 
-
+#ifdef BALLY_STERN_OS_USE_SQUAWK_AND_TALK
 void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 
   byte oldSolenoidControlByte, soundControlByte;
@@ -1141,6 +1141,7 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 
   InsideZeroCrossingInterrupt -= 1;
 }
+#endif
 
 // This function relies on D13 being connected to A5 because it writes to address 0xA0
 // A0  - A0   0
@@ -1157,6 +1158,7 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 // A11 - n/c  0
 // A12 - GND  0
 // A13 - n/c  0
+#ifdef BALLY_STERN_OS_USE_SB100
 void BSOS_PlaySB100(byte soundByte) {
 
   PORTB = PORTB | 0x20;
@@ -1164,7 +1166,7 @@ void BSOS_PlaySB100(byte soundByte) {
   PORTB = PORTB & 0xDF;
   
 }
-
+#endif
 
 
 // EEProm Helper functions
