@@ -25,13 +25,6 @@
 #include "BallySternOS.h"
 
 
-#ifdef BALLY_STERN_OS_USE_AUX_LAMPS
-#define NUM_LAMP_BITS 22
-#define MAX_LAMPS     88
-#else
-#define NUM_LAMP_BITS 15
-#define MAX_LAMPS     60
-#endif 
 
 // Global variables
 volatile byte DisplayDigits[5][6];
@@ -39,8 +32,8 @@ volatile byte DisplayDigitEnable[5];
 volatile boolean DisplayDim[5];
 volatile boolean DisplayOffCycle = false;
 volatile byte CurrentDisplayDigit=0;
-volatile byte LampStates[NUM_LAMP_BITS], LampDim0[NUM_LAMP_BITS], LampDim1[NUM_LAMP_BITS];
-volatile byte LampFlashPeriod[MAX_LAMPS];
+volatile byte LampStates[BSOS_NUM_LAMP_BITS], LampDim0[BSOS_NUM_LAMP_BITS], LampDim1[BSOS_NUM_LAMP_BITS];
+volatile byte LampFlashPeriod[BSOS_MAX_LAMPS];
 byte DimDivisor1 = 2;
 byte DimDivisor2 = 3;
 
@@ -637,7 +630,7 @@ void InterruptService2() {
     }
 
 #ifndef BALLY_STERN_OS_USE_AUX_LAMPS
-    for (int lampBitCount = 0; lampBitCount<NUM_LAMP_BITS; lampBitCount++) {
+    for (int lampBitCount = 0; lampBitCount<BSOS_NUM_LAMP_BITS; lampBitCount++) {
       byte lampData = 0xF0 + lampBitCount;
 
       interrupts();
@@ -666,7 +659,7 @@ void InterruptService2() {
       if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
     }
 #else 
-    for (int lampBitCount=0; lampBitCount<NUM_LAMP_BITS; lampBitCount++) {
+    for (int lampBitCount=0; lampBitCount<BSOS_NUM_LAMP_BITS; lampBitCount++) {
       byte lampData = 0xF0 + lampBitCount;
       if (lampBitCount>14) lampData = 0xF0 + (lampBitCount-15);
 
@@ -703,6 +696,11 @@ void InterruptService2() {
     BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
+
+#ifdef BALLY_STERN_OS_USE_AUX_LAMPS
+    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
+    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);
+#endif 
 
     interrupts();
     noInterrupts();
@@ -860,7 +858,7 @@ void BSOS_SetDimDivisor(byte level, byte divisor) {
 }
 
 void BSOS_SetLampState(int lampNum, byte s_lampState, byte s_lampDim, int s_lampFlashPeriod) {
-  if (lampNum>=MAX_LAMPS || lampNum<0) return;
+  if (lampNum>=BSOS_MAX_LAMPS || lampNum<0) return;
   
   if (s_lampState) {
     int adjustedLampFlash = s_lampFlashPeriod/50;
@@ -893,7 +891,7 @@ void BSOS_SetLampState(int lampNum, byte s_lampState, byte s_lampDim, int s_lamp
 
 
 void BSOS_ApplyFlashToLamps(unsigned long curTime) {
-  for (int count=0; count<MAX_LAMPS; count++) {
+  for (int count=0; count<BSOS_MAX_LAMPS; count++) {
     if ( LampFlashPeriod[count]!=0 ) {
       unsigned long adjustedLampFlash = (unsigned long)LampFlashPeriod[count] * (unsigned long)50;
       if ((curTime/adjustedLampFlash)%2) {
@@ -907,7 +905,7 @@ void BSOS_ApplyFlashToLamps(unsigned long curTime) {
 
 
 void BSOS_FlashAllLamps(unsigned long curTime) {
-  for (int count=0; count<MAX_LAMPS; count++) {
+  for (int count=0; count<BSOS_MAX_LAMPS; count++) {
     BSOS_SetLampState(count, 1, 0, 500);  
   }
 
@@ -915,7 +913,7 @@ void BSOS_FlashAllLamps(unsigned long curTime) {
 }
 
 void BSOS_TurnOffAllLamps() {
-  for (int count=0; count<MAX_LAMPS; count++) {
+  for (int count=0; count<BSOS_MAX_LAMPS; count++) {
     BSOS_SetLampState(count, 0, 0, 0);  
   }
 }
@@ -1016,13 +1014,13 @@ void BSOS_InitializeMPU() {
   }
 
   // Turn off all lamp states
-  for (int lampNibbleCounter=0; lampNibbleCounter<16; lampNibbleCounter++) {
+  for (int lampNibbleCounter=0; lampNibbleCounter<BSOS_NUM_LAMP_BITS; lampNibbleCounter++) {
     LampStates[lampNibbleCounter] = 0xFF;
     LampDim0[lampNibbleCounter] = 0x00;
     LampDim1[lampNibbleCounter] = 0x00;
   }
 
-  for (int lampFlashCount=0; lampFlashCount<MAX_LAMPS; lampFlashCount++) {
+  for (int lampFlashCount=0; lampFlashCount<BSOS_MAX_LAMPS; lampFlashCount++) {
     LampFlashPeriod[lampFlashCount] = 0;
   }
 

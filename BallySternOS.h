@@ -35,6 +35,14 @@ struct PlayfieldAndCabinetSwitch {
 };
 
 
+#ifdef BALLY_STERN_OS_USE_AUX_LAMPS
+#define BSOS_NUM_LAMP_BITS 22
+#define BSOS_MAX_LAMPS     88
+#else
+#define BSOS_NUM_LAMP_BITS 15
+#define BSOS_MAX_LAMPS     60
+#endif 
+
 // Arduino wiring
 // J5       DEFINITION   ARDUINO
 // n/a      IRQ           2

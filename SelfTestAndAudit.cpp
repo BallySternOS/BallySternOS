@@ -99,7 +99,7 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
       BSOS_SetDisplayCredits(0);
       BSOS_SetDisplayBallInPlay(1);
       BSOS_TurnOffAllLamps();
-      for (int count=0; count<60; count++) {
+      for (int count=0; count<BSOS_MAX_LAMPS; count++) {
         BSOS_SetLampState(count, 1, 0, 500);
       }
       CurValue = 99;
@@ -108,9 +108,9 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     if (curSwitch==resetSwitch || resetDoubleClick) {
       CurValue += 1;
       if (CurValue>99) CurValue = 0;
-      if (CurValue==60) {
+      if (CurValue==BSOS_MAX_LAMPS) {
         CurValue = 99;
-        for (int count=0; count<60; count++) {
+        for (int count=0; count<BSOS_MAX_LAMPS; count++) {
           BSOS_SetLampState(count, 1, 0, 500);
         }
       } else {
