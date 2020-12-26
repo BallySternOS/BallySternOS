@@ -665,13 +665,9 @@ void InterruptService2() {
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
 
 #else 
-    BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
-    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
-    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);
 
-    for (int lampBitCount=0; lampBitCount<BSOS_NUM_LAMP_BITS; lampBitCount++) {
+    for (int lampBitCount=0; lampBitCount<15; lampBitCount++) {
       byte lampData = 0xF0 + lampBitCount;
-      if (lampBitCount>14) lampData = 0xF0 + (lampBitCount-15);
 
       interrupts();
       BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
@@ -681,12 +677,10 @@ void InterruptService2() {
       BSOS_DataWrite(ADDRESS_U10_A, lampData);
       if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
 
-      if (lampBitCount<15) BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x38);
-      else BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
+      BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x38);
       if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
 
-      if (lampBitCount<15) BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
-      else BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL)& 0xF7);
+      BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
       if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
 
       // Use the inhibit lines to set the actual data to the lamp SCRs 
@@ -700,20 +694,34 @@ void InterruptService2() {
       BSOS_DataWrite(ADDRESS_U10_A, lampOutput);
       if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
 
-      if (lampBitCount==14) {
-        // Latch 0xFF separately without interrupt clear
-        // to park 0xFF in main lamp board
-        BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
-        BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
-        BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
-      }
     }
-#endif 
+    // Latch 0xFF separately without interrupt clear
+    // to park 0xFF in main lamp board
+    BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
 
-#ifdef BALLY_STERN_OS_USE_AUX_LAMPS
+    for (int lampBitCount=15; lampBitCount<22; lampBitCount++) {
+      byte lampOutput = (LampStates[lampBitCount]&0xF0) | (lampBitCount-15);
+      // Every other time through the cycle, we OR in the dim variable
+      // in order to dim those lights
+      if (numberOfU10Interrupts%DimDivisor1) lampOutput |= LampDim0[lampBitCount];
+      if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
+
+      interrupts();
+      BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+      noInterrupts();
+
+      BSOS_DataWrite(ADDRESS_U10_A, lampOutput | 0xF0);
+      BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
+      BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);    
+      BSOS_DataWrite(ADDRESS_U10_A, lampOutput);
+    }
+    
     BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
     BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
     BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);
+
 #endif 
 
     interrupts();
