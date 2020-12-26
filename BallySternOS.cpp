@@ -444,6 +444,11 @@ void InterruptService2() {
     BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
+#ifdef BALLY_STERN_OS_USE_AUX_LAMPS
+    // Also park the aux lamp board 
+    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
+    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);    
+#endif
 
 // I think this should go before 10A is blasted with FF above
     // Backup U10A
@@ -708,11 +713,9 @@ void InterruptService2() {
       if (numberOfU10Interrupts%DimDivisor1) lampOutput |= LampDim0[lampBitCount];
       if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
 
-#ifndef BALLY_STERN_OS_NO_INTERRUPT_OF_AUX_LAMPS
       interrupts();
       BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
       noInterrupts();
-#endif 
 
       BSOS_DataWrite(ADDRESS_U10_A, lampOutput | 0xF0);
       BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
