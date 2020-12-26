@@ -27,6 +27,7 @@
 //#define BALLY_STERN_OS_USE_SQUAWK_AND_TALK
 #define BALLY_STERN_OS_USE_SB100
 //#define BALLY_STERN_OS_USE_AUX_LAMPS
+//#define BALLY_STERN_OS_NO_INTERRUPT_OF_AUX_LAMPS
 
 struct PlayfieldAndCabinetSwitch {
   byte switchNum;

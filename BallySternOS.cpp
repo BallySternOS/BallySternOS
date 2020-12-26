@@ -708,9 +708,11 @@ void InterruptService2() {
       if (numberOfU10Interrupts%DimDivisor1) lampOutput |= LampDim0[lampBitCount];
       if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
 
+#ifndef BALLY_STERN_OS_NO_INTERRUPT_OF_AUX_LAMPS
       interrupts();
       BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
       noInterrupts();
+#endif 
 
       BSOS_DataWrite(ADDRESS_U10_A, lampOutput | 0xF0);
       BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
