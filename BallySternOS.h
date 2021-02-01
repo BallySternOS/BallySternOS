@@ -20,13 +20,9 @@
 
 #ifndef BALLY_STERN_OS_H
 
+
 #define BALLY_STERN_OS_MAJOR_VERSION  1
 #define BALLY_STERN_OS_MINOR_VERSION  5
-
-//#define BALLY_STERN_OS_USE_DIP_SWITCHES 
-//#define BALLY_STERN_OS_USE_SQUAWK_AND_TALK
-#define BALLY_STERN_OS_USE_SB100
-//#define BALLY_STERN_OS_USE_AUX_LAMPS
 
 struct PlayfieldAndCabinetSwitch {
   byte switchNum;
@@ -35,39 +31,32 @@ struct PlayfieldAndCabinetSwitch {
 };
 
 
-#ifdef BALLY_STERN_OS_USE_AUX_LAMPS
-#define BSOS_NUM_LAMP_BITS 22
-#define BSOS_MAX_LAMPS     88
-#else
-#define BSOS_NUM_LAMP_BITS 15
-#define BSOS_MAX_LAMPS     60
-#endif 
-
 // Arduino wiring
 // J5       DEFINITION   ARDUINO
-// n/a      IRQ           2
+// (pin 34) IRQ           2		if your header doesn't have pin 34, 
+//					clip a lead to the top of R134
 // PIN 32 - NOT USED
 // PIN 31 - GND           GND  
 // PIN 30 - +5V           VIN
 // PIN 29 - Not Used
 // PIN 28 - Ext Mem
-// PIN 27 - Theta2        4
+// PIN 27 - Phi2 (clock)  4
 // PIN 26 - VMA *         A5
 // PIN 25 - /RESET
-// PIN 24 - /HLT *        A6
+// PIN 24 - /HLT *        GND
 // PIN 23 - R/W *         3
 // PIN 22 - A0 *          A0
 // PIN 21 - A1 *          A1
 // PIN 20 - A2
 // PIN 19 - A3 *          A2
 // PIN 18 - A4 *          A3
-// PIN 17 - A5
+// PIN 17 - A5		  (13 through buffer)
 // PIN 16 - A6
 // PIN 15 - A7 *          A4
 // PIN 14 - A8
 // PIN 13 - A9 *          GND
-// PIN 12 - A10           GND
-// PIN 11 - A11           GND
+// PIN 12 - A10           
+// PIN 11 - A11           
 // PIN 10 - A12 *         GND
 // PIN 9 - A13            
 // PIN 8 - D0             5
@@ -89,29 +78,6 @@ struct PlayfieldAndCabinetSwitch {
 #define CONTSOL_DISABLE_FLIPPERS      0x40
 #define CONTSOL_DISABLE_COIN_LOCKOUT  0x20
 
-// This define needs to be set for the number of loops 
-// needed to get a delay of 80 us
-// So, set it to (0.000080) / (1/Clock Frequency)
-// Assuming Frequency = 500kHz,  40 = (0.000080) / (1/500000)
-#define BSOS_NUM_SWITCH_LOOPS 70
-// 60 us
-// So, set this to (0.000060) / (1/Clock Frequency)
-#define BSOS_NUM_LAMP_LOOPS   30
-
-// Fast boards might need a slower lamp strobe
-#define BSOS_SLOW_DOWN_LAMP_STROBE  0
-
-#define BSOS_CREDITS_EEPROM_BYTE          5
-#define BSOS_HIGHSCORE_EEPROM_START_BYTE  1
-#define BSOS_AWARD_SCORE_1_EEPROM_START_BYTE      10
-#define BSOS_AWARD_SCORE_2_EEPROM_START_BYTE      14
-#define BSOS_AWARD_SCORE_3_EEPROM_START_BYTE      18
-#define BSOS_TOTAL_PLAYS_EEPROM_START_BYTE        26
-#define BSOS_TOTAL_REPLAYS_EEPROM_START_BYTE      30
-#define BSOS_TOTAL_HISCORE_BEATEN_START_BYTE      34
-#define BSOS_CHUTE_2_COINS_START_BYTE             38
-#define BSOS_CHUTE_1_COINS_START_BYTE             42
-#define BSOS_CHUTE_3_COINS_START_BYTE             46
 
 
 // Function Prototypes

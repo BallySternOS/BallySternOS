@@ -21,9 +21,10 @@
 #include <Arduino.h>
 #include "SelfTestAndAudit.h"
 #include "BallySternOS.h"
+#include "BSOS_Config.h"
 
 #define MACHINE_STATE_ATTRACT         0
-#define USE_SB100
+//#define USE_SB100
 
 unsigned long LastSolTestTime = 0; 
 unsigned long LastSelfTestChange = 0;
