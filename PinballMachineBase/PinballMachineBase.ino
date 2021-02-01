@@ -1,6 +1,7 @@
 #include "BallySternOS.h"
 #include "PinballMachineBase.h"
 #include "SelfTestAndAudit.h"
+#include "BSOS_Config.h"
 
 #define DEBUG_MESSAGES  1
 
@@ -74,7 +75,7 @@ void setup() {
   if (sawHigh && sawLow) {
     while (1);
   }
-      
+    
   // Tell the OS about game-specific lights and switches
   BSOS_SetupGameSwitches(NUM_SWITCHES_WITH_TRIGGERS, NUM_PRIORITY_SWITCHES_WITH_TRIGGERS, TriggeredSwitches);
 
@@ -291,14 +292,18 @@ int RunAttractMode(int curState, boolean curStateChanged) {
   while ( (switchHit=BSOS_PullFirstFromSwitchStack())!=SWITCH_STACK_EMPTY ) {
     if (switchHit==SW_CREDIT_RESET) {
       if (AddPlayer()) returnState = MACHINE_STATE_INIT_GAMEPLAY;
-    }
-    if (switchHit==SW_COIN_1 || switchHit==SW_COIN_2 || switchHit==SW_COIN_3) {
+    } else if (switchHit==SW_COIN_1 || switchHit==SW_COIN_2 || switchHit==SW_COIN_3) {
       AddCredit();
       BSOS_SetDisplayCredits(Credits, true);
-    }
-    if (switchHit==SW_SELF_TEST_SWITCH && (CurrentTime-GetLastSelfTestChangedTime())>500) {
+    } else if (switchHit==SW_SELF_TEST_SWITCH && (CurrentTime-GetLastSelfTestChangedTime())>500) {
       returnState = MACHINE_STATE_TEST_LIGHTS;
       SetLastSelfTestChangedTime(CurrentTime);
+    } else {
+#ifdef DEBUG_MESSAGES
+      char buf[128];
+      sprintf(buf, "Switch 0x%02X\n", switchHit);
+      Serial.write(buf);
+#endif      
     }
   }
 
