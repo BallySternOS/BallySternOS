@@ -134,7 +134,18 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte);
 #endif
 #ifdef BALLY_STERN_OS_USE_SB100
 void BSOS_PlaySB100(byte soundByte);
+
+#if (BALLY_STERN_OS_HARDWARE_REV==2)
+void BSOS_PlaySB100Chime(byte soundByte);
+#endif 
+
 #endif
+
+#if (BALLY_STERN_OS_HARDWARE_REV==2 && defined(BALLY_STERN_OS_USE_SB300))
+void BSOS_PlaySB300SquareWave(byte soundRegister, byte soundByte);
+void BSOS_PlaySB300Analog(byte soundRegister, byte soundByte);
+#endif 
+
 
 //   General
 byte BSOS_DataRead(int address);

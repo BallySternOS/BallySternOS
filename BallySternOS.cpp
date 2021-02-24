@@ -84,6 +84,7 @@ volatile byte SwitchStackFirst;
 volatile byte SwitchStackLast;
 volatile byte SwitchStack[SWITCH_STACK_SIZE];
 
+#if (BALLY_STERN_OS_HARDWARE_REV==1)
 #define ADDRESS_U10_A           0x14
 #define ADDRESS_U10_A_CONTROL   0x15
 #define ADDRESS_U10_B           0x16
@@ -93,6 +94,22 @@ volatile byte SwitchStack[SWITCH_STACK_SIZE];
 #define ADDRESS_U11_B           0x1A
 #define ADDRESS_U11_B_CONTROL   0x1B
 #define ADDRESS_SB100           0x10
+
+#elif (BALLY_STERN_OS_HARDWARE_REV==2)
+#define ADDRESS_U10_A           0x00
+#define ADDRESS_U10_A_CONTROL   0x01
+#define ADDRESS_U10_B           0x02
+#define ADDRESS_U10_B_CONTROL   0x03
+#define ADDRESS_U11_A           0x08
+#define ADDRESS_U11_A_CONTROL   0x09
+#define ADDRESS_U11_B           0x0A
+#define ADDRESS_U11_B_CONTROL   0x0B
+#define ADDRESS_SB100           0x10
+#define ADDRESS_SB100_CHIMES    0x18
+#define ADDRESS_SB300_SQUARE_WAVES  0x10
+#define ADDRESS_SB300_ANALOG        0x18
+
+#endif 
 
 void BSOS_DataWrite(int address, byte data) {
   
@@ -1004,9 +1021,15 @@ void BSOS_InitializeMPU() {
   // Set up the address lines A0-A7 as output
   DDRC = DDRC | 0x3F;
 
+#if (BALLY_STERN_OS_HARDWARE_REV==1)
   // Set up D13 as address line A5 (and set it low)
   DDRB = DDRB | 0x20;
   PORTB = PORTB & 0xDF;
+#elif (BALLY_STERN_OS_HARDWARE_REV==2) 
+  // Set up D13 as address line A7 (and set it high)
+  DDRB = DDRB | 0x20;
+  PORTB = PORTB | 0x20;
+#endif 
 
   // Set up A6 as output
   pinMode(A6, OUTPUT); // /HLT
@@ -1241,7 +1264,7 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 }
 #endif
 
-// This function relies on D13 being connected to A5 because it writes to address 0xA0
+// With hardware rev 1, this function relies on D13 being connected to A5 because it writes to address 0xA0
 // A0  - A0   0
 // A1  - A1   0   
 // A2  - n/c  0
@@ -1259,13 +1282,39 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 #ifdef BALLY_STERN_OS_USE_SB100
 void BSOS_PlaySB100(byte soundByte) {
 
+#if (BALLY_STERN_OS_HARDWARE_REV==1)
   PORTB = PORTB | 0x20;
+#endif 
+
   BSOS_DataWrite(ADDRESS_SB100, soundByte);
+
+#if (BALLY_STERN_OS_HARDWARE_REV==1)
   PORTB = PORTB & 0xDF;
+#endif 
   
 }
+
+#if (BALLY_STERN_OS_HARDWARE_REV==2)
+void BSOS_PlaySB100Chime(byte soundByte) {
+
+  BSOS_DataWrite(ADDRESS_SB100_CHIMES, soundByte);
+
+}
+#endif 
 #endif
 
+
+#if (BALLY_STERN_OS_HARDWARE_REV==2 && defined(BALLY_STERN_OS_USE_SB300))
+
+void BSOS_PlaySB300SquareWave(byte soundRegister, byte soundByte) {
+  BSOS_DataWrite(ADDRESS_SB300_SQUARE_WAVES+soundRegister, soundByte);
+}
+
+void BSOS_PlaySB300Analog(byte soundRegister, byte soundByte) {
+  BSOS_DataWrite(ADDRESS_SB300_ANALOG+soundRegister, soundByte);
+}
+
+#endif 
 
 // EEProm Helper functions
 
