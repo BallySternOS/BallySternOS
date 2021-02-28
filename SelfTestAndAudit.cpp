@@ -88,7 +88,8 @@ int RunBaseSelfTest(int curState, boolean curStateChanged, unsigned long Current
     }
 
     if (curState<=MACHINE_STATE_TEST_SCORE_LEVEL_1) {
-      BSOS_SetDisplayCredits(abs(curState)+MACHINE_STATE_TEST_SOUNDS);
+//      BSOS_SetDisplayCredits(abs(curState)+MACHINE_STATE_TEST_SOUNDS);
+      BSOS_SetDisplayCredits(MACHINE_STATE_TEST_SOUNDS-curState);
       BSOS_SetDisplayBallInPlay(0, false);
     }
   }

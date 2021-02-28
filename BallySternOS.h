@@ -22,7 +22,7 @@
 
 
 #define BALLY_STERN_OS_MAJOR_VERSION  1
-#define BALLY_STERN_OS_MINOR_VERSION  5
+#define BALLY_STERN_OS_MINOR_VERSION  6
 
 struct PlayfieldAndCabinetSwitch {
   byte switchNum;

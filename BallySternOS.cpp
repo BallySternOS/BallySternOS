@@ -791,6 +791,355 @@ void InterruptService2() {
 }
 
 
+#if defined (BALLY_STERN_OS_SOFTWARE_DISPLAY_INTERRUPT)
+
+ISR(TIMER1_COMPA_vect) {    //This is the interrupt request
+  // Backup U10A
+  byte backupU10A = BSOS_DataRead(ADDRESS_U10_A);
+  
+  // Disable lamp decoders & strobe latch
+  BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+  BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
+  BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
+#ifdef BALLY_STERN_OS_USE_AUX_LAMPS
+  // Also park the aux lamp board 
+  BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
+  BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);    
+#endif
+
+  // Blank Displays
+  BSOS_DataWrite(ADDRESS_U10_A_CONTROL, BSOS_DataRead(ADDRESS_U10_A_CONTROL) & 0xF7);
+  BSOS_DataWrite(ADDRESS_U11_A, (BSOS_DataRead(ADDRESS_U11_A) & 0x03) | 0x01);
+  BSOS_DataWrite(ADDRESS_U10_A, 0x0F);
+
+  // Write current display digits to 5 displays
+  for (int displayCount=0; displayCount<5; displayCount++) {
+
+    if (CurrentDisplayDigit<BSOS_NUM_DIGITS) {
+      // The BCD for this digit is in b4-b7, and the display latch strobes are in b0-b3 (and U11A:b0)
+      byte displayDataByte = ((DisplayDigits[displayCount][CurrentDisplayDigit])<<4) | 0x0F;
+      byte displayEnable = ((DisplayDigitEnable[displayCount])>>CurrentDisplayDigit)&0x01;
+
+      // if this digit shouldn't be displayed, then set data lines to 0xFX so digit will be blank
+      if (!displayEnable) displayDataByte = 0xFF;
+#ifdef BALLY_STERN_OS_DIMMABLE_DISPLAYS        
+      if (DisplayDim[displayCount] && DisplayOffCycle) displayDataByte = 0xFF;
+#endif        
+
+      // Set low the appropriate latch strobe bit
+      if (displayCount<4) {
+        displayDataByte &= ~(0x01<<displayCount);
+      }
+      // Write out the digit & strobe (if it's 0-3)
+      BSOS_DataWrite(ADDRESS_U10_A, displayDataByte);
+      if (displayCount==4) {            
+        // Strobe #5 latch on U11A:b0
+        BSOS_DataWrite(ADDRESS_U11_A, BSOS_DataRead(ADDRESS_U11_A) & 0xFE);
+      }
+
+      // Need to delay a little to make sure the strobe is low for long enough
+      WaitClockCycle(4);
+
+      // Put the latch strobe bits back high
+      if (displayCount<4) {
+        displayDataByte |= 0x0F;
+        BSOS_DataWrite(ADDRESS_U10_A, displayDataByte);
+      } else {
+        BSOS_DataWrite(ADDRESS_U11_A, BSOS_DataRead(ADDRESS_U11_A) | 0x01);
+        
+        // Set proper display digit enable
+#ifdef BALLY_STERN_OS_USE_7_DIGIT_DISPLAYS          
+        byte displayDigitsMask = (0x02<<CurrentDisplayDigit) | 0x01;
+#else
+        byte displayDigitsMask = (0x04<<CurrentDisplayDigit) | 0x01;
+#endif          
+        BSOS_DataWrite(ADDRESS_U11_A, displayDigitsMask);
+      }
+    }
+  }
+
+  // Stop Blanking (current digits are all latched and ready)
+  BSOS_DataWrite(ADDRESS_U10_A_CONTROL, BSOS_DataRead(ADDRESS_U10_A_CONTROL) | 0x08);
+
+  // Restore 10A from backup
+  BSOS_DataWrite(ADDRESS_U10_A, backupU10A);    
+
+  CurrentDisplayDigit = CurrentDisplayDigit + 1;
+  if (CurrentDisplayDigit>=BSOS_NUM_DIGITS) {
+    CurrentDisplayDigit = 0;
+    DisplayOffCycle ^= true;
+  }
+}
+
+void InterruptService3() {
+  byte u10AControl = BSOS_DataRead(ADDRESS_U10_A_CONTROL);
+  if (u10AControl & 0x80) {
+    // self test switch
+    if (BSOS_DataRead(ADDRESS_U10_A_CONTROL) & 0x80) PushToSwitchStack(SW_SELF_TEST_SWITCH);
+    BSOS_DataRead(ADDRESS_U10_A);
+  }
+
+  // If we get a weird interupt from U11B, clear it
+  byte u11BControl = BSOS_DataRead(ADDRESS_U11_B_CONTROL);
+  if (u11BControl & 0x80) {
+    BSOS_DataRead(ADDRESS_U11_B);    
+  }
+
+  byte u11AControl = BSOS_DataRead(ADDRESS_U11_A_CONTROL);
+  byte u10BControl = BSOS_DataRead(ADDRESS_U10_B_CONTROL);
+
+  // If the interrupt bit on the display interrupt is on, do the display refresh
+  if (u11AControl & 0x80) {
+    BSOS_DataRead(ADDRESS_U11_A);
+    numberOfU11Interrupts+=1;
+  }
+
+  // If the IRQ bit of U10BControl is set, do the Zero-crossing interrupt handler
+  if ((u10BControl & 0x80) && (InsideZeroCrossingInterrupt==0)) {
+    InsideZeroCrossingInterrupt = InsideZeroCrossingInterrupt + 1;
+
+    byte u10BControlLatest = BSOS_DataRead(ADDRESS_U10_B_CONTROL);
+
+    // Backup contents of U10A
+    byte backup10A = BSOS_DataRead(ADDRESS_U10_A);
+
+    // Latch 0xFF separately without interrupt clear
+    BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
+    // Read U10B to clear interrupt
+    BSOS_DataRead(ADDRESS_U10_B);
+
+    // Turn off U10BControl interrupts
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
+
+    // Copy old switch values
+    byte switchCount;
+    byte startingClosures;
+    byte validClosures;
+    for (switchCount=0; switchCount<5; switchCount++) {
+      SwitchesMinus2[switchCount] = SwitchesMinus1[switchCount];
+      SwitchesMinus1[switchCount] = SwitchesNow[switchCount];
+
+      // Enable playfield strobe
+      BSOS_DataWrite(ADDRESS_U10_A, 0x01<<switchCount);
+      BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x34);
+
+      // Delay for switch capacitors to charge
+      WaitClockCycle(BSOS_NUM_SWITCH_LOOPS);
+      
+      // Read the switches
+      SwitchesNow[switchCount] = BSOS_DataRead(ADDRESS_U10_B);
+
+      //Unset the strobe
+      BSOS_DataWrite(ADDRESS_U10_A, 0x00);
+
+      // Some switches need to trigger immediate closures (bumpers & slings)
+      startingClosures = (SwitchesNow[switchCount]) & (~SwitchesMinus1[switchCount]);
+      boolean immediateSolenoidFired = false;
+      // If one of the switches is starting to close (off, on)
+      if (startingClosures) {
+        // Loop on bits of switch byte
+        for (byte bitCount=0; bitCount<8 && immediateSolenoidFired==false; bitCount++) {
+          // If this switch bit is closed
+          if (startingClosures&0x01) {
+            byte startingSwitchNum = switchCount*8 + bitCount;
+            // Loop on immediate switch data
+            for (int immediateSwitchCount=0; immediateSwitchCount<NumGamePrioritySwitches && immediateSolenoidFired==false; immediateSwitchCount++) {
+              // If this switch requires immediate action
+              if (GameSwitches && startingSwitchNum==GameSwitches[immediateSwitchCount].switchNum) {
+                // Start firing this solenoid (just one until the closure is validate
+                PushToFrontOfSolenoidStack(GameSwitches[immediateSwitchCount].solenoid, 1);
+                immediateSolenoidFired = true;
+              }
+            }
+          }
+          startingClosures = startingClosures>>1;
+        }
+      }
+
+      immediateSolenoidFired = false;
+      validClosures = (SwitchesNow[switchCount] & SwitchesMinus1[switchCount]) & ~SwitchesMinus2[switchCount];
+      // If there is a valid switch closure (off, on, on)
+      if (validClosures) {
+        // Loop on bits of switch byte
+        for (byte bitCount=0; bitCount<8; bitCount++) {
+          // If this switch bit is closed
+          if (validClosures&0x01) {
+            byte validSwitchNum = switchCount*8 + bitCount;
+            // Loop through all switches and see what's triggered
+            for (int validSwitchCount=0; validSwitchCount<NumGameSwitches; validSwitchCount++) {
+
+              // If we've found a valid closed switch
+              if (GameSwitches && GameSwitches[validSwitchCount].switchNum==validSwitchNum) {
+
+                // If we're supposed to trigger a solenoid, then do it
+                if (GameSwitches[validSwitchCount].solenoid!=SOL_NONE) {
+                  if (validSwitchCount<NumGamePrioritySwitches && immediateSolenoidFired==false) {
+                    PushToFrontOfSolenoidStack(GameSwitches[validSwitchCount].solenoid, GameSwitches[validSwitchCount].solenoidHoldTime);
+                  } else {
+                    BSOS_PushToSolenoidStack(GameSwitches[validSwitchCount].solenoid, GameSwitches[validSwitchCount].solenoidHoldTime);
+                  }
+                } // End if this is a real solenoid
+              } // End if this is a switch in the switch table
+            } // End loop on switches in switch table
+            // Push this switch to the game rules stack
+            PushToSwitchStack(validSwitchNum);
+          }
+          validClosures = validClosures>>1;
+        }        
+      }
+
+      // There are no port reads or writes for the rest of the loop, 
+      // so we can allow the display interrupt to fire
+      interrupts();
+      
+      // Wait so total delay will allow lamp SCRs to get to the proper voltage
+      WaitClockCycle(BSOS_NUM_LAMP_LOOPS);
+      
+      noInterrupts();
+    }
+    BSOS_DataWrite(ADDRESS_U10_A, backup10A);
+
+    // If we need to turn off momentary solenoids, do it first
+    byte momentarySolenoidAtStart = PullFirstFromSolenoidStack();
+    if (momentarySolenoidAtStart!=SOLENOID_STACK_EMPTY) {
+      CurrentSolenoidByte = (CurrentSolenoidByte&0xF0) | momentarySolenoidAtStart;
+      BSOS_DataWrite(ADDRESS_U11_B, CurrentSolenoidByte);
+    } else {
+      CurrentSolenoidByte = (CurrentSolenoidByte&0xF0) | SOL_NONE;
+      BSOS_DataWrite(ADDRESS_U11_B, CurrentSolenoidByte);
+    }
+
+#ifndef BALLY_STERN_OS_USE_AUX_LAMPS
+    for (int lampBitCount = 0; lampBitCount<BSOS_NUM_LAMP_BITS; lampBitCount++) {
+      byte lampData = 0xF0 + lampBitCount;
+
+      interrupts();
+      BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+      noInterrupts();
+      
+      // Latch address & strobe
+      BSOS_DataWrite(ADDRESS_U10_A, lampData);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+
+      BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x38);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+
+      BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+
+      // Use the inhibit lines to set the actual data to the lamp SCRs 
+      // (here, we don't care about the lower nibble because the address was already latched)
+      byte lampOutput = LampStates[lampBitCount];
+      // Every other time through the cycle, we OR in the dim variable
+      // in order to dim those lights
+      if (numberOfU10Interrupts%DimDivisor1) lampOutput |= LampDim0[lampBitCount];
+      if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
+
+      BSOS_DataWrite(ADDRESS_U10_A, lampOutput);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+    }
+
+    // Latch 0xFF separately without interrupt clear
+    BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
+
+#else 
+
+    for (int lampBitCount=0; lampBitCount<15; lampBitCount++) {
+      byte lampData = 0xF0 + lampBitCount;
+
+      interrupts();
+      BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+      noInterrupts();
+      
+      // Latch address & strobe
+      BSOS_DataWrite(ADDRESS_U10_A, lampData);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+
+      BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x38);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+
+      BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+
+      // Use the inhibit lines to set the actual data to the lamp SCRs 
+      // (here, we don't care about the lower nibble because the address was already latched)
+      byte lampOutput = LampStates[lampBitCount];
+      // Every other time through the cycle, we OR in the dim variable
+      // in order to dim those lights
+      if (numberOfU10Interrupts%DimDivisor1) lampOutput |= LampDim0[lampBitCount];
+      if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
+
+      BSOS_DataWrite(ADDRESS_U10_A, lampOutput);
+#ifdef BSOS_SLOW_DOWN_LAMP_STROBE      
+      WaitClockCycle();
+#endif      
+
+    }
+    // Latch 0xFF separately without interrupt clear
+    // to park 0xFF in main lamp board
+    BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) | 0x08);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, BSOS_DataRead(ADDRESS_U10_B_CONTROL) & 0xF7);
+
+    for (int lampBitCount=15; lampBitCount<22; lampBitCount++) {
+      byte lampOutput = (LampStates[lampBitCount]&0xF0) | (lampBitCount-15);
+      // Every other time through the cycle, we OR in the dim variable
+      // in order to dim those lights
+      if (numberOfU10Interrupts%DimDivisor1) lampOutput |= LampDim0[lampBitCount];
+      if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
+
+      interrupts();
+      BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+      noInterrupts();
+
+      BSOS_DataWrite(ADDRESS_U10_A, lampOutput | 0xF0);
+      BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
+      BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);    
+      BSOS_DataWrite(ADDRESS_U10_A, lampOutput);
+    }
+    
+    BSOS_DataWrite(ADDRESS_U10_A, 0xFF);
+    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) | 0x08);
+    BSOS_DataWrite(ADDRESS_U11_A_CONTROL, BSOS_DataRead(ADDRESS_U11_A_CONTROL) & 0xF7);
+
+#endif 
+
+    interrupts();
+    noInterrupts();
+
+    InsideZeroCrossingInterrupt = 0;
+    BSOS_DataWrite(ADDRESS_U10_A, backup10A);
+    BSOS_DataWrite(ADDRESS_U10_B_CONTROL, u10BControlLatest);
+
+    // Read U10B to clear interrupt
+    BSOS_DataRead(ADDRESS_U10_B);
+    numberOfU10Interrupts+=1;
+  }
+}
+
+
+
+#endif 
+
+
 
 
 void BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagnitude, byte minDigits) {
@@ -1106,7 +1455,35 @@ void BSOS_InitializeMPU() {
   }
   
   // Hook up the interrupt
+#if not defined (BALLY_STERN_OS_SOFTWARE_DISPLAY_INTERRUPT)
   attachInterrupt(digitalPinToInterrupt(2), InterruptService2, LOW);
+#else
+/*
+  cli();
+  TCCR2A|=(1<<WGM21);     //Set the CTC mode
+  OCR2A=0xBA;            //Set the value for 3ms
+  TIMSK2|=(1<<OCIE2A);   //Set the interrupt request
+  TCCR2B|=(1<<CS22);     //Set the prescale 1/64 clock
+  sei();                 //Enable interrupt
+*/  
+
+  cli();
+  //set timer1 interrupt at 1Hz
+  TCCR1A = 0;// set entire TCCR1A register to 0
+  TCCR1B = 0;// same for TCCR1B
+  TCNT1  = 0;//initialize counter value to 0
+  // set compare match register for 332.4hz increments
+  OCR1A = 46;// = (16*10^6) / (1*1024) - 1 (must be <65536)
+  // turn on CTC mode
+  TCCR1B |= (1 << WGM12);
+  // Set CS10 and CS12 bits for 1024 prescaler
+  TCCR1B |= (1 << CS12) | (1 << CS10);  
+  // enable timer compare interrupt
+  TIMSK1 |= (1 << OCIE1A);
+  sei();
+  
+  attachInterrupt(digitalPinToInterrupt(2), InterruptService3, LOW);
+#endif  
   BSOS_DataRead(0);  // Reset address bus
 
   // Cleary all possible interrupts by reading the registers
