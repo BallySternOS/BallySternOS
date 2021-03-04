@@ -1225,13 +1225,22 @@ void BSOS_SetDisplayFlashCredits(unsigned long curTime, int period) {
 
 
 void BSOS_SetDisplayCredits(int value, boolean displayOn, boolean showBothDigits) {
+#ifdef BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
+  DisplayDigits[4][2] = (value%100) / 10;
+  DisplayDigits[4][3] = (value%10);
+  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_1;
+#else
   DisplayDigits[4][1] = (value%100) / 10;
   DisplayDigits[4][2] = (value%10);
-
-  byte enableMask = DisplayDigitEnable[4] & 0x30;
+  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_2;
+#endif 
 
   if (displayOn) {
-    if (value>9 || showBothDigits) enableMask |= 0x06;
+#ifdef BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
+  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_2;
+#else
+  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_1;
+#endif
     else enableMask |= 0x04;
   }
 
@@ -1243,14 +1252,23 @@ void BSOS_SetDisplayMatch(int value, boolean displayOn, boolean showBothDigits) 
 }
 
 void BSOS_SetDisplayBallInPlay(int value, boolean displayOn, boolean showBothDigits) {
+#ifdef BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
+  DisplayDigits[4][5] = (value%100) / 10;
+  DisplayDigits[4][6] = (value%10); 
+  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_2;
+#else
   DisplayDigits[4][4] = (value%100) / 10;
-  DisplayDigits[4][5] = (value%10);  
-
-  byte enableMask = DisplayDigitEnable[4] & 0x06;
+  DisplayDigits[4][5] = (value%10); 
+  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_1;
+#endif
 
   if (displayOn) {
-    if (value>9 || showBothDigits) enableMask |= 0x30;
-    else enableMask |= 0x20;
+#ifdef BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
+  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_1;
+#else
+  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_2;
+#endif
+      else enableMask |= 0x20;
   }
 
   DisplayDigitEnable[4] = enableMask;

@@ -22,7 +22,7 @@
 
 /***
 
-	Use this file to set game-specific and hardware-specific parameters
+    Use this file to set game-specific and hardware-specific parameters
 
 ***/
 
@@ -31,6 +31,9 @@
 //#define BALLY_STERN_OS_USE_SB100
 //#define BALLY_STERN_OS_USE_AUX_LAMPS
 //#define BALLY_STERN_OS_USE_7_DIGIT_DISPLAYS
+//#define BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
+#define BALLY_STERN_OS_HARDWARE_REV       1
+
 
 #ifdef BALLY_STERN_OS_USE_7_DIGIT_DISPLAYS
 #define BALLY_STERN_OS_MAX_DISPLAY_SCORE  9999999
@@ -40,6 +43,14 @@
 #define BALLY_STERN_OS_MAX_DISPLAY_SCORE  999999
 #define BALLY_STERN_OS_NUM_DIGITS         6
 #define BALLY_STERN_OS_ALL_DIGITS_MASK    0x3F
+#endif
+
+#ifdef BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
+#define BALLY_STERN_OS_MASK_SHIFT_1            0x60
+#define BALLY_STERN_OS_MASK_SHIFT_2            0x0C
+#else
+#define BALLY_STERN_OS_MASK_SHIFT_1            0x30
+#define BALLY_STERN_OS_MASK_SHIFT_2            0x06
 #endif
 
 
