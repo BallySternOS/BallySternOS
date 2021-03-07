@@ -120,6 +120,9 @@ void BSOS_SetDisplayFlash(int displayNumber, unsigned long value, unsigned long 
 void BSOS_SetDisplayFlashCredits(unsigned long curTime, int period=100);
 void BSOS_CycleAllDisplays(unsigned long curTime, byte digitNum=0); // Self-test function
 byte BSOS_GetDisplayBlank(int displayNumber);
+#if defined(BALLY_STERN_OS_SOFTWARE_DISPLAY_INTERRUPT) && defined(BALLY_STERN_OS_ADJUSTABLE_DISPLAY_INTERRUPT)
+void BSOS_SetDisplayRefreshConstant(int intervalConstant);
+#endif
 
 //   Lamps
 void BSOS_SetLampState(int lampNum, byte s_lampState, byte s_lampDim=0, int s_lampFlashPeriod=0);
