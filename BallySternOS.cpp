@@ -1638,6 +1638,7 @@ void BSOS_CycleAllDisplays(unsigned long curTime, byte digitNum) {
 }
 
 #ifdef BALLY_STERN_OS_USE_SQUAWK_AND_TALK
+
 void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 
   byte oldSolenoidControlByte, soundControlByte;
@@ -1658,7 +1659,7 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
   BSOS_DataWrite(ADDRESS_U11_B, oldSolenoidControlByte | 0x0F);
 
   // Strobe sound latch
-  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)|0x04);
+  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)|0x08);
   
   // put the new byte on U11:PortB
   BSOS_DataWrite(ADDRESS_U11_B, soundControlByte);
@@ -1675,6 +1676,7 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 
   // wait 78 microseconds
   delayMicroseconds(78);
+  BSOS_DataWrite(ADDRESS_U11_B, oldSolenoidControlByte);
 
   // Turn off sound latch
   BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)&0xF7);
