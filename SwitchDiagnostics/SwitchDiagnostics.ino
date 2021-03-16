@@ -165,6 +165,17 @@ void WaitOneClockCycle() {
   while((PIND & 0x10));
 }
 
+void WaitClockCycles(unsigned long numCycles) {
+  for (unsigned long count=0; count<numCycles; count++) {
+    // Wait while clock is low
+    while(!(PIND & 0x10));
+  
+    // Wait for a falling edge of the clock
+    while((PIND & 0x10));
+  }
+}
+
+
 
 void ReadDipSwitches() {
   /*byte backupU10A = */BSOS_DataRead(ADDRESS_U10_A);
@@ -175,7 +186,8 @@ void ReadDipSwitches() {
   BSOS_DataWrite(ADDRESS_U10_A, 0x20);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl & 0xF7);
   // Wait for switch capacitors to charge
-  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+//  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+  delayMicroseconds(SwitchChargeDelay);
   DipSwitches[0] = BSOS_DataRead(ADDRESS_U10_B);
   delay(1);
 
@@ -183,7 +195,8 @@ void ReadDipSwitches() {
   BSOS_DataWrite(ADDRESS_U10_A, 0x40);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl & 0xF7);
   // Wait for switch capacitors to charge
-  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+//  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+  delayMicroseconds(SwitchChargeDelay);
   DipSwitches[1] = BSOS_DataRead(ADDRESS_U10_B);
   delay(1);
 
@@ -191,7 +204,8 @@ void ReadDipSwitches() {
   BSOS_DataWrite(ADDRESS_U10_A, 0x80);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl & 0xF7);
   // Wait for switch capacitors to charge
-  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+//  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+  delayMicroseconds(SwitchChargeDelay);
   DipSwitches[2] = BSOS_DataRead(ADDRESS_U10_B);
   delay(1);
 
@@ -199,7 +213,8 @@ void ReadDipSwitches() {
   BSOS_DataWrite(ADDRESS_U10_A, 0x00);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl | 0x08);
   // Wait for switch capacitors to charge
-  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+//  for (int count=0; count<SwitchChargeDelay; count++) WaitOneClockCycle();
+  delayMicroseconds(SwitchChargeDelay);
   DipSwitches[3] = BSOS_DataRead(ADDRESS_U10_B);
   delay(1);
 
@@ -243,6 +258,7 @@ volatile unsigned long numberOfU11Interrupts = 0;
 volatile unsigned long numberOfU10Interrupts = 0;
 volatile byte InsideZeroCrossingInterrupt = 0;
 unsigned long TestStartTime = 0;
+unsigned long TestEndTime = 0;
 
 
 void TestFrequenciesISR() {
@@ -437,7 +453,7 @@ void SwitchReadingISR() {
     // Turn off U10BControl interrupts
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
 
-    int waitCount = 0;
+//    int waitCount = 0;
     
     // Copy old switch values
     byte switchCount;
@@ -451,7 +467,8 @@ void SwitchReadingISR() {
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x34);
 
       // Delay for switch capacitors to charge
-      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+//      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+      delayMicroseconds(SwitchChargeDelay);
       
       // Read the switches
       SwitchesNow[switchCount] = BSOS_DataRead(ADDRESS_U10_B);
@@ -491,7 +508,8 @@ void SwitchReadingISR() {
       interrupts();
       
       // Wait so total delay will allow lamp SCRs to get to the proper voltage
-      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+//      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+      delayMicroseconds(SwitchDischargeDelay);
       noInterrupts();
     }
     BSOS_DataWrite(ADDRESS_U10_A, backup10A);
@@ -572,10 +590,11 @@ void SwitchAndDisplayISR() {
         }
 
         // Need to delay a little to make sure the strobe is low for long enough
-        WaitOneClockCycle();
-        WaitOneClockCycle();
-        WaitOneClockCycle();
-        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+        delayMicroseconds(5);
 
         // Put the latch strobe bits back high
         if (displayCount<4) {
@@ -622,7 +641,7 @@ void SwitchAndDisplayISR() {
     // Turn off U10BControl interrupts
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
 
-    int waitCount = 0;
+//    int waitCount = 0;
     
     // Copy old switch values
     byte switchCount;
@@ -636,7 +655,8 @@ void SwitchAndDisplayISR() {
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x34);
 
       // Delay for switch capacitors to charge
-      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+//      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+      delayMicroseconds(SwitchChargeDelay);
       
       // Read the switches
       SwitchesNow[switchCount] = BSOS_DataRead(ADDRESS_U10_B);
@@ -676,7 +696,8 @@ void SwitchAndDisplayISR() {
       interrupts();
       
       // Wait so total delay will allow lamp SCRs to get to the proper voltage
-      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+//      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+      delayMicroseconds(SwitchDischargeDelay);
       noInterrupts();
     }
     BSOS_DataWrite(ADDRESS_U10_A, backup10A);
@@ -757,10 +778,11 @@ void SwitchDisplayLampISR() {
         }
 
         // Need to delay a little to make sure the strobe is low for long enough
-        WaitOneClockCycle();
-        WaitOneClockCycle();
-        WaitOneClockCycle();
-        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+        delayMicroseconds(5);
 
         // Put the latch strobe bits back high
         if (displayCount<4) {
@@ -809,7 +831,7 @@ void SwitchDisplayLampISR() {
     // Turn off U10BControl interrupts
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
 
-    int waitCount = 0;
+//    int waitCount = 0;
     
     // Copy old switch values
     byte switchCount;
@@ -824,7 +846,8 @@ void SwitchDisplayLampISR() {
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x34);
 
       // Delay for switch capacitors to charge
-      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+//      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+      delayMicroseconds(SwitchChargeDelay);
       
       // Read the switches
       SwitchesNow[switchCount] = BSOS_DataRead(ADDRESS_U10_B);
@@ -864,7 +887,8 @@ void SwitchDisplayLampISR() {
       interrupts();
       
       // Wait so total delay will allow lamp SCRs to get to the proper voltage
-      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+//      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+      delayMicroseconds(SwitchDischargeDelay);
       noInterrupts();
     }
     BSOS_DataWrite(ADDRESS_U10_A, backup10A);
@@ -1094,10 +1118,11 @@ void InterruptService2() {
         }
 
         // Need to delay a little to make sure the strobe is low for long enough
-        WaitOneClockCycle();
-        WaitOneClockCycle();
-        WaitOneClockCycle();
-        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+//        WaitOneClockCycle();
+        delayMicroseconds(5);
 
         // Put the latch strobe bits back high
         if (displayCount<4) {
@@ -1146,7 +1171,7 @@ void InterruptService2() {
     // Turn off U10BControl interrupts
     BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
 
-    int waitCount = 0;
+//    int waitCount = 0;
     
     // Copy old switch values
     byte switchCount;
@@ -1161,7 +1186,8 @@ void InterruptService2() {
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x34);
 
       // Delay for switch capacitors to charge
-      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+//      for (waitCount=0; waitCount<SwitchChargeDelay; waitCount++) WaitOneClockCycle();      
+      delayMicroseconds(SwitchChargeDelay);
       
       // Read the switches
       SwitchesNow[switchCount] = BSOS_DataRead(ADDRESS_U10_B);
@@ -1230,7 +1256,9 @@ void InterruptService2() {
       interrupts();
       
       // Wait so total delay will allow lamp SCRs to get to the proper voltage
-      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+//      for (waitCount=0; waitCount<SwitchDischargeDelay; waitCount++) WaitOneClockCycle();
+      delayMicroseconds(SwitchDischargeDelay);
+      
       noInterrupts();
     }
     BSOS_DataWrite(ADDRESS_U10_A, backup10A);
@@ -1255,13 +1283,16 @@ void InterruptService2() {
       
       // Latch address & strobe
       BSOS_DataWrite(ADDRESS_U10_A, lampData);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
 
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x38);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
 
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
 
       // Use the inhibit lines to set the actual data to the lamp SCRs 
       // (here, we don't care about the lower nibble because the address was already latched)
@@ -1272,7 +1303,8 @@ void InterruptService2() {
       if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
 
       BSOS_DataWrite(ADDRESS_U10_A, lampOutput);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
     }
 
     // Latch 0xFF separately without interrupt clear
@@ -1291,13 +1323,16 @@ void InterruptService2() {
       
       // Latch address & strobe
       BSOS_DataWrite(ADDRESS_U10_A, lampData);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
 
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x38);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
 
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x30);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
 
       // Use the inhibit lines to set the actual data to the lamp SCRs 
       // (here, we don't care about the lower nibble because the address was already latched)
@@ -1308,7 +1343,8 @@ void InterruptService2() {
       if (numberOfU10Interrupts%DimDivisor2) lampOutput |= LampDim1[lampBitCount];
 
       BSOS_DataWrite(ADDRESS_U10_A, lampOutput);
-      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+//      if (BSOS_SLOW_DOWN_LAMP_STROBE) WaitOneClockCycle();
+      if (BSOS_SLOW_DOWN_LAMP_STROBE) delayMicroseconds(1);
 
     }
     // Latch 0xFF separately without interrupt clear
@@ -1555,11 +1591,13 @@ void loop() {
         NumberOfRisingClocks = 0;
         LastClockState = 0;
         TestStartTime = millis();
-        for (unsigned long count=0; count<1000000; count++) {
-          WaitOneClockCycle();
-        }
+//        for (unsigned long count=0; count<1000000; count++) {
+//          WaitOneClockCycle();
+//        }
+        WaitClockCycles(1000000);
+        TestEndTime = millis();
       } else {
-        sprintf(buf, ".. Clock frequency approximately %d kHz\n", (int)(1000000/(millis()-TestStartTime)));
+        sprintf(buf, ".. Clock frequency approximately %d kHz\n", (int)(1000000/(TestEndTime-TestStartTime)));
         Serial.write(buf);
         Serial.write("Done with clock test\n");
         TestNumber += 1;
