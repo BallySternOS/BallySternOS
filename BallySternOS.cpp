@@ -1256,14 +1256,14 @@ void BSOS_SetDisplayCredits(int value, boolean displayOn, boolean showBothDigits
 #else
   DisplayDigits[4][1] = (value%100) / 10;
   DisplayDigits[4][2] = (value%10);
-  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_2;
+  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_1;
 #endif 
 
   if (displayOn) {
 #ifdef BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
   if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_2;
 #else
-  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_1;
+  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_2; 
 #endif
     else enableMask |= 0x04;
   }
@@ -1283,14 +1283,14 @@ void BSOS_SetDisplayBallInPlay(int value, boolean displayOn, boolean showBothDig
 #else
   DisplayDigits[4][4] = (value%100) / 10;
   DisplayDigits[4][5] = (value%10); 
-  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_1;
+  byte enableMask = DisplayDigitEnable[4] & BALLY_STERN_OS_MASK_SHIFT_2;
 #endif
 
   if (displayOn) {
 #ifdef BALLY_STERN_OS_USE_6_DIGIT_CREDIT_DISPLAY_WITH_7_DIGIT_DISPLAYS
   if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_1;
 #else
-  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_2;
+  if (value>9 || showBothDigits) enableMask |= BALLY_STERN_OS_MASK_SHIFT_1;
 #endif
       else enableMask |= 0x20;
   }
