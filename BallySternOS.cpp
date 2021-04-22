@@ -22,6 +22,7 @@
 #include <EEPROM.h>
 //#define DEBUG_MESSAGES    1
 #define BALLY_STERN_CPP_FILE
+#include "BSOS_Config.h"
 #include "BallySternOS.h"
 
 #ifndef BALLY_STERN_OS_HARDWARE_REV
@@ -186,6 +187,14 @@ byte BSOS_DataRead(int address) {
   // Pulse VMA over one clock cycle
   // Set VMA ON
   PORTC = PORTC | 0x20;
+
+  // Wait a full clock cycle to make sure data lines are ready
+  // (important for faster clocks)
+  // Wait while clock is low
+  while(!(PIND & 0x10));
+
+  // Wait for a falling edge of the clock
+  while((PIND & 0x10));
   
   // Wait while clock is low
   while(!(PIND & 0x10));
@@ -262,28 +271,44 @@ void ReadDipSwitches() {
   BSOS_DataWrite(ADDRESS_U10_A, 0x20);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl & 0xF7);
   // Wait for switch capacitors to charge
+#ifndef BSOS_UPDATED_TIMING  
   WaitClockCycle(BSOS_NUM_SWITCH_LOOPS);
+#else 
+  delayMicroseconds(BSOS_SWITCH_DELAY_IN_MICROSECONDS);
+#endif
   DipSwitches[0] = BSOS_DataRead(ADDRESS_U10_B);
  
   // Turn on Switch strobe 6 & Read Switches
   BSOS_DataWrite(ADDRESS_U10_A, 0x40);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl & 0xF7);
   // Wait for switch capacitors to charge
+#ifndef BSOS_UPDATED_TIMING  
   WaitClockCycle(BSOS_NUM_SWITCH_LOOPS);
+#else 
+  delayMicroseconds(BSOS_SWITCH_DELAY_IN_MICROSECONDS);
+#endif
   DipSwitches[1] = BSOS_DataRead(ADDRESS_U10_B);
 
   // Turn on Switch strobe 7 & Read Switches
   BSOS_DataWrite(ADDRESS_U10_A, 0x80);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl & 0xF7);
   // Wait for switch capacitors to charge
+#ifndef BSOS_UPDATED_TIMING  
   WaitClockCycle(BSOS_NUM_SWITCH_LOOPS);
+#else 
+  delayMicroseconds(BSOS_SWITCH_DELAY_IN_MICROSECONDS);
+#endif
   DipSwitches[2] = BSOS_DataRead(ADDRESS_U10_B);
 
   // Turn on U10 CB2 (strobe 8) and read switches
   BSOS_DataWrite(ADDRESS_U10_A, 0x00);
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl | 0x08);
   // Wait for switch capacitors to charge
+#ifndef BSOS_UPDATED_TIMING  
   WaitClockCycle(BSOS_NUM_SWITCH_LOOPS);
+#else 
+  delayMicroseconds(BSOS_SWITCH_DELAY_IN_MICROSECONDS);
+#endif
   DipSwitches[3] = BSOS_DataRead(ADDRESS_U10_B);
 
   BSOS_DataWrite(ADDRESS_U10_B_CONTROL, backupU10BControl);
@@ -585,7 +610,11 @@ void InterruptService2() {
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x34);
 
       // Delay for switch capacitors to charge
+#ifndef BSOS_UPDATED_TIMING  
       WaitClockCycle(BSOS_NUM_SWITCH_LOOPS);
+#else 
+      delayMicroseconds(BSOS_SWITCH_DELAY_IN_MICROSECONDS);
+#endif
       
       // Read the switches
       SwitchesNow[switchCount] = BSOS_DataRead(ADDRESS_U10_B);
@@ -654,7 +683,11 @@ void InterruptService2() {
       interrupts();
       
       // Wait so total delay will allow lamp SCRs to get to the proper voltage
+#ifndef BSOS_UPDATED_TIMING  
       WaitClockCycle(BSOS_NUM_LAMP_LOOPS);
+#else 
+      delayMicroseconds(BSOS_TIMING_LOOP_PADDING_IN_MICROSECONDS);
+#endif
       
       noInterrupts();
     }
@@ -930,7 +963,11 @@ void InterruptService3() {
       BSOS_DataWrite(ADDRESS_U10_B_CONTROL, 0x34);
 
       // Delay for switch capacitors to charge
+#ifndef BSOS_UPDATED_TIMING  
       WaitClockCycle(BSOS_NUM_SWITCH_LOOPS);
+#else 
+      delayMicroseconds(BSOS_SWITCH_DELAY_IN_MICROSECONDS);
+#endif
       
       // Read the switches
       SwitchesNow[switchCount] = BSOS_DataRead(ADDRESS_U10_B);
@@ -999,7 +1036,11 @@ void InterruptService3() {
       interrupts();
       
       // Wait so total delay will allow lamp SCRs to get to the proper voltage
+#ifndef BSOS_UPDATED_TIMING  
       WaitClockCycle(BSOS_NUM_LAMP_LOOPS);
+#else 
+      delayMicroseconds(BSOS_TIMING_LOOP_PADDING_IN_MICROSECONDS);
+#endif
       
       noInterrupts();
     }
@@ -1376,7 +1417,8 @@ void BSOS_TurnOffAllLamps() {
 
 void BSOS_InitializeMPU() {
   // Wait for board to boot
-  delay(100);
+  delayMicroseconds(50000);
+  delayMicroseconds(50000);
 
   // Start out with everything tri-state, in case the original
   // CPU is running
@@ -1646,11 +1688,11 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
   // mask further zero-crossing interrupts during this 
   InsideZeroCrossingInterrupt += 1;
 
-  // Get the current value of U11:PortB
+  // Get the current value of U11:PortB - current solenoids
   oldSolenoidControlByte = BSOS_DataRead(ADDRESS_U11_B);
   soundControlByte = oldSolenoidControlByte; 
   
-  // Mask off momentary solenoids
+  // Mask off momentary solenoids (keeping continuous solenoids)
   soundControlByte &= 0xF0;
   // Add in lower nibble
   soundControlByte |= (soundByte&0x0F);
@@ -1660,8 +1702,12 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 
   // Strobe sound latch
   BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)|0x08);
-  
-  // put the new byte on U11:PortB
+  // Let the strobe stay high for a moment
+  delayMicroseconds(40);
+  // Turn off sound latch
+  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)&0xF7);
+    
+  // put the new byte on U11:PortB (the lower nibble is currently loaded)
   BSOS_DataWrite(ADDRESS_U11_B, soundControlByte);
   
   // wait 142 microseconds
@@ -1671,15 +1717,14 @@ void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
   soundControlByte &= 0xF0;
   // Put upper nibble on lines
   soundControlByte |= (soundByte/16);
-  // put the new byte on U11:PortB
+  // put the new byte on U11:PortB (the uppper nibble is currently loaded)
   BSOS_DataWrite(ADDRESS_U11_B, soundControlByte);
 
   // wait 78 microseconds
   delayMicroseconds(78);
-  BSOS_DataWrite(ADDRESS_U11_B, oldSolenoidControlByte);
 
-  // Turn off sound latch
-  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)&0xF7);
+  // Restore the original solenoid byte
+  BSOS_DataWrite(ADDRESS_U11_B, oldSolenoidControlByte);
 
   InsideZeroCrossingInterrupt -= 1;
 }
