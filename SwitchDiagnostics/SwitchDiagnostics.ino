@@ -106,6 +106,12 @@ byte BSOS_DataRead(int address) {
   // Pulse VMA over one clock cycle
   // Set VMA ON
   PORTC = PORTC | 0x20;
+
+    // Wait while clock is low
+    while(!(PIND & 0x10));
+  
+    // Wait for a falling edge of the clock
+    while((PIND & 0x10));
   
   // Wait while clock is low
   while(!(PIND & 0x10));
@@ -1409,8 +1415,8 @@ void StartSwitchTest(bool testWithDisplays, bool testWithLamps, bool fullTest) {
   SwitchStackFirst = 0;
   SwitchStackLast = 0;
 
-  SwitchChargeDelay     = 120;
-  SwitchDischargeDelay  = 70;
+  SwitchChargeDelay = 200;
+  SwitchDischargeDelay = 10;
 
   for (int count=0; count<5; count++) {
     SwitchesMinus2[count] = 0xFF;
