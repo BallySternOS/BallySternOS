@@ -21,8 +21,8 @@
 #ifndef BALLY_STERN_OS_H
 
 
-#define BALLY_STERN_OS_MAJOR_VERSION  1
-#define BALLY_STERN_OS_MINOR_VERSION  7
+#define BALLY_STERN_OS_MAJOR_VERSION  2
+#define BALLY_STERN_OS_MINOR_VERSION  0
 
 struct PlayfieldAndCabinetSwitch {
   byte switchNum;
@@ -111,7 +111,7 @@ boolean BSOS_PushToTimedSolenoidStack(byte solenoidNumber, byte numPushes, unsig
 void BSOS_UpdateTimedSolenoidStack(unsigned long curTime);
 
 //   Displays
-void BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagnitude=false, byte minDigits=2);
+byte BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagnitude=false, byte minDigits=2);
 void BSOS_SetDisplayBlank(int displayNumber, byte bitMask);
 void BSOS_SetDisplayCredits(int value, boolean displayOn = true, boolean showBothDigits=true);
 void BSOS_SetDisplayMatch(int value, boolean displayOn = true, boolean showBothDigits=true);

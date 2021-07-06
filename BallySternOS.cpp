@@ -17,6 +17,10 @@
 
     See <https://www.gnu.org/licenses/>.
  */
+
+
+// Extra ball & credit broken with two-player game because score changes between players
+
  
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -114,7 +118,27 @@ volatile byte SwitchStack[SWITCH_STACK_SIZE];
 #define ADDRESS_SB300_SQUARE_WAVES  0x10
 #define ADDRESS_SB300_ANALOG        0x18
 
+#elif (BALLY_STERN_OS_HARDWARE_REV==3)
+
+#define ADDRESS_U10_A           0x88
+#define ADDRESS_U10_A_CONTROL   0x89
+#define ADDRESS_U10_B           0x8A
+#define ADDRESS_U10_B_CONTROL   0x8B
+#define ADDRESS_U11_A           0x90
+#define ADDRESS_U11_A_CONTROL   0x91
+#define ADDRESS_U11_B           0x92
+#define ADDRESS_U11_B_CONTROL   0x93
+#define ADDRESS_SB100           0xA0
+#define ADDRESS_SB100_CHIMES    0xC0
+#define ADDRESS_SB300_SQUARE_WAVES  0xA0
+#define ADDRESS_SB300_ANALOG        0xC0
+
 #endif 
+
+
+
+
+#if (BALLY_STERN_OS_HARDWARE_REV==1) or (BALLY_STERN_OS_HARDWARE_REV==2)
 
 void BSOS_DataWrite(int address, byte data) {
   
@@ -226,6 +250,143 @@ void WaitClockCycle(int numCycles=1) {
     while((PIND & 0x10));
   }
 }
+
+#elif (BALLY_STERN_OS_HARDWARE_REV==3)
+
+// Rev 3 connections
+// Pin D2 = IRQ
+// Pin D3 = CLOCK
+// Pin D4 = VMA
+// Pin D5 = R/W
+// Pin D6-12 = D0-D6
+// Pin D13 = SWITCH
+// Pin D14 = HALT
+// Pin D15 = D7
+// Pin D16-30 = A0-A14
+
+
+void BSOS_DataWrite(int address, byte data) {
+  
+  // Set data pins to output
+  DDRH = DDRH | 0x78;
+  DDRB = DDRB | 0x70;
+  DDRJ = DDRJ | 0x01;
+
+  // Set R/W to LOW
+  PORTE = (PORTE & 0xF7);
+
+  // Put data on pins
+  // Lower Nibble goes on PortH3 through H6
+  PORTH = (PORTH&0x87) | ((data&0x0F)<<3);
+  // Bits 4-6 go on PortB4 through B6
+  PORTB = (PORTB&0x8F) | ((data&0x70));
+  // Bit 7 goes on PortJ0
+  PORTJ = (PORTJ&0xFE) | (data>>7);  
+
+  // Set up address lines
+  PORTH = (PORTH & 0xFC) | ((address & 0x0001)<<1) | ((address & 0x0002)>>1); // A0-A1
+  PORTD = (PORTD & 0xF0) | ((address & 0x0004)<<1) | ((address & 0x0008)>>1) | ((address & 0x0010)>>3) | ((address & 0x0020)>>5); // A2-A5
+  PORTA = ((address & 0x3FC0)>>6); // A6-A13
+  PORTC = (PORTC & 0x3F) | ((address & 0x4000)>>7) | ((address & 0x8000)>>9); // A14-A15
+
+  // Wait for a falling edge of the clock
+  while((PINE & 0x20));
+
+  // Pulse VMA over one clock cycle
+  // Set VMA ON
+  PORTG = PORTG | 0x20;
+
+  // Wait while clock is low
+  while(!(PINE & 0x20));
+
+  // Set VMA OFF
+  PORTG = PORTG & 0xDF;
+
+  // Unset address lines
+  PORTH = (PORTH & 0xFC);
+  PORTD = (PORTD & 0xF0);
+  PORTA = 0;
+  PORTC = (PORTC & 0x3F);
+  
+  // Set R/W back to HIGH
+  PORTE = (PORTE | 0x08);
+
+  // Set data pins to input
+  DDRH = DDRH & 0x87;
+  DDRB = DDRB & 0x8F;
+  DDRJ = DDRJ & 0xFE;
+  
+}
+
+
+
+byte BSOS_DataRead(int address) {
+  
+  // Set data pins to input
+  DDRH = DDRH & 0x87;
+  DDRB = DDRB & 0x8F;
+  DDRJ = DDRJ & 0xFE;
+
+  // Set R/W to HIGH
+  DDRE = DDRE | 0x08;
+  PORTE = (PORTE | 0x08);
+
+  // Set up address lines
+  PORTH = (PORTH & 0xFC) | ((address & 0x0001)<<1) | ((address & 0x0002)>>1); // A0-A1
+  PORTD = (PORTD & 0xF0) | ((address & 0x0004)<<1) | ((address & 0x0008)>>1) | ((address & 0x0010)>>3) | ((address & 0x0020)>>5); // A2-A5
+  PORTA = ((address & 0x3FC0)>>6); // A6-A13
+  PORTC = (PORTC & 0x3F) | ((address & 0x4000)>>7) | ((address & 0x8000)>>9); // A14-A15
+
+  // Wait for a falling edge of the clock
+  while((PINE & 0x20));
+
+  // Pulse VMA over one clock cycle
+  // Set VMA ON
+  PORTG = PORTG | 0x20;
+
+  // Wait a full clock cycle to make sure data lines are ready
+  // (important for faster clocks)
+  // Wait while clock is low
+  while(!(PINE & 0x20));
+
+  // Wait for a falling edge of the clock
+  while((PINE & 0x20));
+  
+  // Wait while clock is low
+  while(!(PINE & 0x20));
+
+  byte inputData;
+  inputData = (PINH & 0x78)>>3;
+  inputData |= (PINB & 0x70);
+  inputData |= PINJ << 7;
+
+  // Set VMA OFF
+  PORTG = PORTG & 0xDF;
+
+  // Set R/W to LOW
+  PORTE = (PORTE & 0xF7);
+
+  // Unset address lines
+  PORTH = (PORTH & 0xFC);
+  PORTD = (PORTD & 0xF0);
+  PORTA = 0;
+  PORTC = (PORTC & 0x3F);
+
+  return inputData;
+}
+
+
+void WaitClockCycle(int numCycles=1) {
+  for (int count=0; count<numCycles; count++) {
+    // Wait while clock is low
+    while(!(PINE & 0x20));
+  
+    // Wait for a falling edge of the clock
+    while((PINE & 0x20));
+  }
+}
+
+#endif
 
 
 void TestLightOn() {
@@ -1187,8 +1348,8 @@ void InterruptService3() {
 
 
 
-void BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagnitude, byte minDigits) {
-  if (displayNumber<0 || displayNumber>4) return;
+byte BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagnitude, byte minDigits) {
+  if (displayNumber<0 || displayNumber>4) return 0;
 
   byte blank = 0x00;
 
@@ -1200,7 +1361,8 @@ void BSOS_SetDisplay(int displayNumber, unsigned long value, boolean blankByMagn
   }
 
   if (blankByMagnitude) DisplayDigitEnable[displayNumber] = blank;
-//  else DisplayDigitEnable[displayNumber] = 0x3F;
+
+  return blank;
 }
 
 void BSOS_SetDisplayBlank(int displayNumber, byte bitMask) {
@@ -1420,6 +1582,8 @@ void BSOS_InitializeMPU() {
   delayMicroseconds(50000);
   delayMicroseconds(50000);
 
+
+#if (BALLY_STERN_OS_HARDWARE_REV==1) or (BALLY_STERN_OS_HARDWARE_REV==2)
   // Start out with everything tri-state, in case the original
   // CPU is running
   // Set data pins to input
@@ -1435,7 +1599,7 @@ void BSOS_InitializeMPU() {
   boolean sawLow = false;
   // for three seconds, look for activity on the VMA line (A5)
   // If we see anything, then the MPU is active so we shouldn't run
-  while ((millis()-startTime)<2000) {
+  while ((millis()-startTime)<1000) {
     if (digitalRead(A5)) sawHigh = true;
     else sawLow = true;
   }
@@ -1444,7 +1608,28 @@ void BSOS_InitializeMPU() {
   if (sawHigh && sawLow) {
     while (1);
   }
+
+
+#elif (BALLY_STERN_OS_HARDWARE_REV==3)
+  for (byte count=2; count<32; count++) pinMode(count, INPUT);
+
+  // Decide if halt should be raised (based on switch) TBD
+  pinMode(13, INPUT);
+  if (digitalRead(13)) {
+    pinMode(14, OUTPUT); // Halt
+    digitalWrite(14, LOW);
+  } else {
+    pinMode(14, OUTPUT); // Halt
+    digitalWrite(14, HIGH);
+    while(digitalRead(13)==0);
+    digitalWrite(14, LOW);
+  }  
   
+#endif  
+
+  
+
+#if (BALLY_STERN_OS_HARDWARE_REV==1)
   // Arduino A0 = MPU A0
   // Arduino A1 = MPU A1
   // Arduino A2 = MPU A3
@@ -1453,20 +1638,29 @@ void BSOS_InitializeMPU() {
   // Arduino A5 = MPU VMA
   // Set up the address lines A0-A7 as output
   DDRC = DDRC | 0x3F;
-
-#if (BALLY_STERN_OS_HARDWARE_REV==1)
   // Set up D13 as address line A5 (and set it low)
   DDRB = DDRB | 0x20;
   PORTB = PORTB & 0xDF;
 #elif (BALLY_STERN_OS_HARDWARE_REV==2) 
+  // Set up the address lines A0-A7 as output
+  DDRC = DDRC | 0x3F;
   // Set up D13 as address line A7 (and set it high)
   DDRB = DDRB | 0x20;
   PORTB = PORTB | 0x20;
-#endif 
+#elif (BALLY_STERN_OS_HARDWARE_REV==3) 
+  pinMode(3, INPUT); // CLK
+  pinMode(4, OUTPUT); // VMA
+  pinMode(5, OUTPUT); // R/W
+  for (byte count=6; count<13; count++) pinMode(count, INPUT); // D0-D6
+  pinMode(13, INPUT); // Switch
+  pinMode(14, OUTPUT); // Halt
+  pinMode(15, INPUT); // D7
+  for (byte count=16; count<32; count++) pinMode(count, OUTPUT); // Address lines are output
+  digitalWrite(5, HIGH);  // Set R/W line high (Read)
+  digitalWrite(4, LOW);  // Set VMA line LOW
+#endif
 
-  // Set up A6 as output
-  pinMode(A6, OUTPUT); // /HLT
-
+#if (BALLY_STERN_OS_HARDWARE_REV==1) or (BALLY_STERN_OS_HARDWARE_REV==2)
   // Arduino 2 = /IRQ (input)
   // Arduino 3 = R/W (output)
   // Arduino 4 = Clk (input)
@@ -1479,8 +1673,9 @@ void BSOS_InitializeMPU() {
 
   digitalWrite(3, HIGH);  // Set R/W line high (Read)
   digitalWrite(A5, LOW);  // Set VMA line LOW
-  digitalWrite(A6, HIGH); // Set
+#endif 
 
+  // Interrupt line (IRQ)
   pinMode(2, INPUT);
 
   // Prep the address bus (all lines zero)
@@ -1683,50 +1878,47 @@ void BSOS_CycleAllDisplays(unsigned long curTime, byte digitNum) {
 
 void BSOS_PlaySoundSquawkAndTalk(byte soundByte) {
 
-  byte oldSolenoidControlByte, soundControlByte;
+  byte oldSolenoidControlByte, soundLowerNibble, soundUpperNibble;
 
   // mask further zero-crossing interrupts during this 
-  InsideZeroCrossingInterrupt += 1;
+  noInterrupts();
 
   // Get the current value of U11:PortB - current solenoids
   oldSolenoidControlByte = BSOS_DataRead(ADDRESS_U11_B);
-  soundControlByte = oldSolenoidControlByte; 
-  
-  // Mask off momentary solenoids (keeping continuous solenoids)
-  soundControlByte &= 0xF0;
-  // Add in lower nibble
-  soundControlByte |= (soundByte&0x0F);
-
+  soundLowerNibble = (oldSolenoidControlByte&0xF0) | (soundByte&0x0F); 
+  soundUpperNibble = (oldSolenoidControlByte&0xF0) | (soundByte/16); 
+    
   // Put 1s on momentary solenoid lines
   BSOS_DataWrite(ADDRESS_U11_B, oldSolenoidControlByte | 0x0F);
 
-  // Strobe sound latch
-  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)|0x08);
-  // Let the strobe stay high for a moment
-  delayMicroseconds(40);
-  // Turn off sound latch
-  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, BSOS_DataRead(ADDRESS_U11_B_CONTROL)&0xF7);
-    
-  // put the new byte on U11:PortB (the lower nibble is currently loaded)
-  BSOS_DataWrite(ADDRESS_U11_B, soundControlByte);
+  // Put sound latch low
+  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, 0x34);
+
+  // Let the strobe stay low for a moment
+  delayMicroseconds(32);
+
+  // Put sound latch high
+  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, 0x3C);
   
-  // wait 142 microseconds
-  delayMicroseconds(142);
+  // put the new byte on U11:PortB (the lower nibble is currently loaded)
+  BSOS_DataWrite(ADDRESS_U11_B, soundLowerNibble);
+        
+  // wait 138 microseconds
+  delayMicroseconds(138);
 
-  // remove lower nibble
-  soundControlByte &= 0xF0;
-  // Put upper nibble on lines
-  soundControlByte |= (soundByte/16);
   // put the new byte on U11:PortB (the uppper nibble is currently loaded)
-  BSOS_DataWrite(ADDRESS_U11_B, soundControlByte);
+  BSOS_DataWrite(ADDRESS_U11_B, soundUpperNibble);
 
-  // wait 78 microseconds
-  delayMicroseconds(78);
+  // wait 76 microseconds
+  delayMicroseconds(145);
 
   // Restore the original solenoid byte
   BSOS_DataWrite(ADDRESS_U11_B, oldSolenoidControlByte);
 
-  InsideZeroCrossingInterrupt -= 1;
+  // Put sound latch low
+  BSOS_DataWrite(ADDRESS_U11_B_CONTROL, 0x34);
+
+  interrupts();
 }
 #endif
 
